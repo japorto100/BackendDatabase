@@ -1,0 +1,105 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+{% load model_filters %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" type="text/css" href="{% static 'admin/css/dashboard.css' %}">
+  <style>
+    /* Simple internal styles as a test */
+    .test-div {
+      color: blue;
+      background-color: #f0f0f0;
+      padding: 10px;
+      margin: 10px 0;
+    }
+  </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label='models_app' %}">Models</a>
+  &rsaquo; Dashboard
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>AI Model Dashboard</h1>
+
+<div class="test-div">
+  If you can see this text in blue with a gray background, the template and CSS are working.
+</div>
+
+<div class="dashboard-container">
+  <div class="dashboard-card">
+    <h2>Model Overview</h2>
+    <p>Total Models: {{ total_models }}</p>
+    <p>Active Models: {{ active_count }}</p>
+    <p>Inactive Models: {{ inactive_count }}</p>
+    <p>Vision-Capable Models: {{ vision_capable_count }}</p>
+  </div>
+</div>
+
+<div class="dashboard-container">
+  <div class="dashboard-card">
+    <h2>Models by Provider</h2>
+    <div class="provider-chart">
+      {% for provider in provider_counts %}
+        <div class="chart-bar" style="height: {{ provider.count|multiply:20 }}px;">
+          <div class="chart-bar-label">{{ provider.count }}</div>
+          <div class="chart-bar-name">{{ provider.provider }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-container">
+  <div class="dashboard-card">
+    <h2>Top Used Models</h2>
+    <table class="usage-table">
+      <thead>
+        <tr>
+          <th>Model ID</th>
+          <th>Total Usage</th>
+          <th>Success</th>
+          <th>Errors</th>
+          <th>Success Rate</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for stat in stats %}
+          <tr>
+            <td>{{ stat.model_id }}</td>
+            <td>{{ stat.total_count }}</td>
+            <td>{{ stat.success_count }}</td>
+            <td>{{ stat.error_count }}</td>
+            <td>
+              {% if stat.total_count > 0 %}
+                {{ stat.success_count|floatformat:0 }}%
+              {% else %}
+                N/A
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="5">No usage data available yet.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="dashboard-container">
+  <div class="dashboard-card">
+    <h2>Actions</h2>
+    <p>
+      <a href="{% url 'admin:models_app_aimodel_changelist' %}" class="button">Manage Models</a>
+      <a href="{% url 'admin:models_app_modelusagestats_changelist' %}" class="button">View All Usage Stats</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

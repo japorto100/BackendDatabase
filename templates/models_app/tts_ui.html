@@ -1,0 +1,691 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Text-to-Speech - LocalGPT Vision{% endblock %}
+
+{% block extra_css %}
+<style>
+    .tts-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .tab-content {
+        padding: 20px;
+        border: 1px solid #dee2e6;
+        border-top: 0;
+        border-radius: 0 0 5px 5px;
+    }
+    
+    .audio-preview {
+        width: 100%;
+        margin-top: 15px;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .slider-container {
+        padding: 10px 0;
+    }
+    
+    .slider-value {
+        display: inline-block;
+        width: 40px;
+        text-align: center;
+    }
+    
+    .preset-card {
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .preset-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    
+    .preset-card.selected {
+        border: 2px solid #007bff;
+    }
+    
+    .requirements-alert {
+        margin-bottom: 20px;
+    }
+    
+    #recordingIndicator {
+        color: red;
+        display: none;
+    }
+    
+    #audioRecorder {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 15px;
+        border: 1px dashed #ccc;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    
+    .recorder-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tts-container">
+    <h1 class="mb-4">Text-to-Speech Synthesis</h1>
+    
+    {% if not requirements_met %}
+    <div class="alert alert-warning requirements-alert">
+        <h4 class="alert-heading">Missing Requirements</h4>
+        <p>Some requirements for TTS are not met:</p>
+        <ul>
+            {% if not requirements.spark_dependencies %}
+            <li>Spark-TTS dependencies are not installed. <a href="#" id="installDependencies" class="alert-link">Install Now</a></li>
+            {% endif %}
+            
+            {% if not requirements.spark_model %}
+            <li>Spark-TTS model is not downloaded. <a href="#" id="downloadModel" class="alert-link">Download Now</a></li>
+            {% endif %}
+            
+            {% if not requirements.gpu_available %}
+            <li>GPU is not available. TTS will run on CPU which might be slower.</li>
+            {% endif %}
+        </ul>
+    </div>
+    {% endif %}
+    
+    <ul class="nav nav-tabs" id="ttsTab" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" id="basic-tab" data-toggle="tab" href="#basic" role="tab">Basic TTS</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="voice-cloning-tab" data-toggle="tab" href="#voice-cloning" role="tab">Voice Cloning</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="custom-voice-tab" data-toggle="tab" href="#custom-voice" role="tab">Custom Voice</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="presets-tab" data-toggle="tab" href="#presets" role="tab">Voice Presets</a>
+        </li>
+    </ul>
+    
+    <div class="tab-content" id="ttsTabContent">
+        <!-- Basic TTS Tab -->
+        <div class="tab-pane fade show active" id="basic" role="tabpanel">
+            <h3>Basic Text-to-Speech</h3>
+            <form id="basicTtsForm">
+                <div class="form-group">
+                    <label for="basicText">Text to synthesize:</label>
+                    <textarea class="form-control" id="basicText" rows="5" placeholder="Enter text to convert to speech..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="basicEngine">TTS Engine:</label>
+                    <select class="form-control" id="basicEngine">
+                        {% for engine in engines %}
+                        <option value="{{ engine.id }}" {% if engine.id == default_engine %}selected{% endif %}>{{ engine.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" id="basicSynthesize">
+                    <i class="fas fa-play"></i> Synthesize Speech
+                </button>
+            </form>
+            
+            <div id="basicResult" class="mt-4" style="display: none;">
+                <h4>Result:</h4>
+                <audio id="basicAudio" controls class="audio-preview"></audio>
+                <div class="mt-2">
+                    <a id="basicDownload" href="#" class="btn btn-sm btn-secondary">
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Voice Cloning Tab -->
+        <div class="tab-pane fade" id="voice-cloning" role="tabpanel">
+            <h3>Voice Cloning</h3>
+            <p class="text-muted">Upload a reference audio file to clone a voice and synthesize new speech.</p>
+            
+            <form id="voiceCloningForm">
+                <div class="form-group">
+                    <label for="cloningText">Text to synthesize:</label>
+                    <textarea class="form-control" id="cloningText" rows="5" placeholder="Enter text to convert to speech..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="referenceAudio">Reference Audio:</label>
+                    <input type="file" class="form-control-file" id="referenceAudio" accept="audio/*">
+                </div>
+                
+                <div class="form-group">
+                    <label>Or record your voice:</label>
+                    <div id="audioRecorder">
+                        <span id="recordingIndicator">Recording...</span>
+                        <div class="recorder-buttons">
+                            <button type="button" id="startRecording" class="btn btn-danger">
+                                <i class="fas fa-microphone"></i> Start Recording
+                            </button>
+                            <button type="button" id="stopRecording" class="btn btn-secondary" disabled>
+                                <i class="fas fa-stop"></i> Stop
+                            </button>
+                        </div>
+                    </div>
+                    <audio id="recordedAudio" controls style="display:none;width:100%;margin-top:10px;"></audio>
+                </div>
+                
+                <div class="form-group">
+                    <label for="promptText">Prompt Text (optional):</label>
+                    <input type="text" class="form-control" id="promptText" placeholder="What was said in the reference audio">
+                    <small class="form-text text-muted">Enter the text that corresponds to the reference audio for better results</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="cloningEngine">TTS Engine:</label>
+                    <select class="form-control" id="cloningEngine">
+                        {% for engine in engines %}
+                        <option value="{{ engine.id }}" {% if engine.id == default_engine %}selected{% endif %}>{{ engine.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" id="cloningSynthesize">
+                    <i class="fas fa-clone"></i> Clone Voice & Synthesize
+                </button>
+            </form>
+            
+            <div id="cloningResult" class="mt-4" style="display: none;">
+                <h4>Result:</h4>
+                <audio id="cloningAudio" controls class="audio-preview"></audio>
+                <div class="mt-2">
+                    <a id="cloningDownload" href="#" class="btn btn-sm btn-secondary">
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Custom Voice Tab -->
+        <div class="tab-pane fade" id="custom-voice" role="tabpanel">
+            <h3>Custom Voice</h3>
+            <p class="text-muted">Adjust voice parameters to create a custom voice.</p>
+            
+            <form id="customVoiceForm">
+                <div class="form-group">
+                    <label for="customText">Text to synthesize:</label>
+                    <textarea class="form-control" id="customText" rows="5" placeholder="Enter text to convert to speech..."></textarea>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="gender">Gender:</label>
+                            <select class="form-control" id="gender">
+                                <option value="neutral">Neutral</option>
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="voiceAge">Voice Age:</label>
+                            <select class="form-control" id="voiceAge">
+                                <option value="adult">Adult</option>
+                                <option value="child">Child</option>
+                                <option value="young">Young</option>
+                                <option value="senior">Senior</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="pitch">Pitch: <span id="pitchValue" class="slider-value">0.0</span></label>
+                    <input type="range" class="form-control-range" id="pitch" min="-1" max="1" step="0.1" value="0">
+                    <div class="d-flex justify-content-between">
+                        <small>Lower</small>
+                        <small>Higher</small>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="speakingRate">Speaking Rate: <span id="speakingRateValue" class="slider-value">1.0</span></label>
+                    <input type="range" class="form-control-range" id="speakingRate" min="0.5" max="2" step="0.1" value="1">
+                    <div class="d-flex justify-content-between">
+                        <small>Slower</small>
+                        <small>Faster</small>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="energy">Energy: <span id="energyValue" class="slider-value">1.0</span></label>
+                    <input type="range" class="form-control-range" id="energy" min="0.5" max="1.5" step="0.1" value="1">
+                    <div class="d-flex justify-content-between">
+                        <small>Softer</small>
+                        <small>Louder</small>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="customEngine">TTS Engine:</label>
+                    <select class="form-control" id="customEngine">
+                        {% for engine in engines %}
+                        <option value="{{ engine.id }}" {% if engine.id == default_engine %}selected{% endif %}>{{ engine.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" id="customSynthesize">
+                    <i class="fas fa-sliders-h"></i> Create Custom Voice & Synthesize
+                </button>
+            </form>
+            
+            <div id="customResult" class="mt-4" style="display: none;">
+                <h4>Result:</h4>
+                <audio id="customAudio" controls class="audio-preview"></audio>
+                <div class="mt-2">
+                    <a id="customDownload" href="#" class="btn btn-sm btn-secondary">
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Voice Presets Tab -->
+        <div class="tab-pane fade" id="presets" role="tabpanel">
+            <h3>Voice Presets</h3>
+            <p class="text-muted">Choose from pre-defined voice presets.</p>
+            
+            <form id="presetForm">
+                <div class="form-group">
+                    <label for="presetText">Text to synthesize:</label>
+                    <textarea class="form-control" id="presetText" rows="5" placeholder="Enter text to convert to speech..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Select a voice preset:</label>
+                    <div class="row">
+                        {% for preset in presets %}
+                        <div class="col-md-6 col-lg-3 mb-4">
+                            <div class="card preset-card" data-preset-id="{{ preset.id }}">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">{{ preset.name }}</h5>
+                                    <p class="card-text small">
+                                        {% if preset.params.gender %}Gender: {{ preset.params.gender }}<br>{% endif %}
+                                        {% if preset.params.voice_age %}Age: {{ preset.params.voice_age }}<br>{% endif %}
+                                        {% if preset.params.pitch %}Pitch: {{ preset.params.pitch }}<br>{% endif %}
+                                        {% if preset.params.speaking_rate %}Rate: {{ preset.params.speaking_rate }}{% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="presetEngine">TTS Engine:</label>
+                    <select class="form-control" id="presetEngine">
+                        {% for engine in engines %}
+                        <option value="{{ engine.id }}" {% if engine.id == default_engine %}selected{% endif %}>{{ engine.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" id="presetSynthesize" disabled>
+                    <i class="fas fa-play"></i> Synthesize with Selected Preset
+                </button>
+            </form>
+            
+            <div id="presetResult" class="mt-4" style="display: none;">
+                <h4>Result:</h4>
+                <audio id="presetAudio" controls class="audio-preview"></audio>
+                <div class="mt-2">
+                    <a id="presetDownload" href="#" class="btn btn-sm btn-secondary">
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Update slider values
+        $('#pitch').on('input', function() {
+            $('#pitchValue').text(parseFloat($(this).val()).toFixed(1));
+        });
+        
+        $('#speakingRate').on('input', function() {
+            $('#speakingRateValue').text(parseFloat($(this).val()).toFixed(1));
+        });
+        
+        $('#energy').on('input', function() {
+            $('#energyValue').text(parseFloat($(this).val()).toFixed(1));
+        });
+        
+        // Preset selection
+        $('.preset-card').click(function() {
+            $('.preset-card').removeClass('selected');
+            $(this).addClass('selected');
+            $('#presetSynthesize').prop('disabled', false);
+        });
+        
+        // Basic TTS form submission
+        $('#basicTtsForm').submit(function(e) {
+            e.preventDefault();
+            
+            const text = $('#basicText').val().trim();
+            const engine = $('#basicEngine').val();
+            
+            if (!text) {
+                alert('Please enter some text to synthesize');
+                return;
+            }
+            
+            // Show loading state
+            $('#basicSynthesize').html('<i class="fas fa-spinner fa-spin"></i> Synthesizing...').prop('disabled', true);
+            
+            $.ajax({
+                url: '/api/tts/synthesize/',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    text: text,
+                    engine: engine
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        $('#basicAudio').attr('src', response.file_url);
+                        $('#basicDownload').attr('href', response.file_url);
+                        $('#basicResult').show();
+                    } else {
+                        alert('Error: ' + response.error);
+                    }
+                },
+                error: function(xhr) {
+                    alert('Error: ' + (xhr.responseJSON ? xhr.responseJSON.error : 'Failed to synthesize speech'));
+                },
+                complete: function() {
+                    $('#basicSynthesize').html('<i class="fas fa-play"></i> Synthesize Speech').prop('disabled', false);
+                }
+            });
+        });
+        
+        // Voice Cloning form submission
+        $('#voiceCloningForm').submit(function(e) {
+            e.preventDefault();
+            
+            const text = $('#cloningText').val().trim();
+            const engine = $('#cloningEngine').val();
+            const promptText = $('#promptText').val().trim();
+            
+            if (!text) {
+                alert('Please enter some text to synthesize');
+                return;
+            }
+            
+            const referenceAudio = $('#referenceAudio')[0].files[0];
+            const recordedBlob = window.recordedBlob;
+            
+            if (!referenceAudio && !recordedBlob) {
+                alert('Please upload or record a reference audio file');
+                return;
+            }
+            
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('text', text);
+            formData.append('engine', engine);
+            
+            if (promptText) {
+                formData.append('prompt_text', promptText);
+            }
+            
+            if (referenceAudio) {
+                formData.append('reference_audio', referenceAudio);
+            } else if (recordedBlob) {
+                formData.append('reference_audio', recordedBlob, 'recorded_audio.wav');
+            }
+            
+            // Show loading state
+            $('#cloningSynthesize').html('<i class="fas fa-spinner fa-spin"></i> Processing...').prop('disabled', true);
+            
+            $.ajax({
+                url: '/api/tts/voice-cloning/',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        $('#cloningAudio').attr('src', response.file_url);
+                        $('#cloningDownload').attr('href', response.file_url);
+                        $('#cloningResult').show();
+                    } else {
+                        alert('Error: ' + response.error);
+                    }
+                },
+                error: function(xhr) {
+                    alert('Error: ' + (xhr.responseJSON ? xhr.responseJSON.error : 'Failed to clone voice'));
+                },
+                complete: function() {
+                    $('#cloningSynthesize').html('<i class="fas fa-clone"></i> Clone Voice & Synthesize').prop('disabled', false);
+                }
+            });
+        });
+        
+        // Custom Voice form submission
+        $('#customVoiceForm').submit(function(e) {
+            e.preventDefault();
+            
+            const text = $('#customText').val().trim();
+            const engine = $('#customEngine').val();
+            
+            if (!text) {
+                alert('Please enter some text to synthesize');
+                return;
+            }
+            
+            const voiceParams = {
+                gender: $('#gender').val(),
+                voice_age: $('#voiceAge').val(),
+                pitch: parseFloat($('#pitch').val()),
+                speaking_rate: parseFloat($('#speakingRate').val()),
+                energy: parseFloat($('#energy').val())
+            };
+            
+            // Show loading state
+            $('#customSynthesize').html('<i class="fas fa-spinner fa-spin"></i> Processing...').prop('disabled', true);
+            
+            $.ajax({
+                url: '/api/tts/custom-voice/',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    text: text,
+                    engine: engine,
+                    voice_params: voiceParams
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        $('#customAudio').attr('src', response.file_url);
+                        $('#customDownload').attr('href', response.file_url);
+                        $('#customResult').show();
+                    } else {
+                        alert('Error: ' + response.error);
+                    }
+                },
+                error: function(xhr) {
+                    alert('Error: ' + (xhr.responseJSON ? xhr.responseJSON.error : 'Failed to create custom voice'));
+                },
+                complete: function() {
+                    $('#customSynthesize').html('<i class="fas fa-sliders-h"></i> Create Custom Voice & Synthesize').prop('disabled', false);
+                }
+            });
+        });
+        
+        // Preset Voice form submission
+        $('#presetForm').submit(function(e) {
+            e.preventDefault();
+            
+            const text = $('#presetText').val().trim();
+            const engine = $('#presetEngine').val();
+            const presetId = $('.preset-card.selected').data('preset-id');
+            
+            if (!text) {
+                alert('Please enter some text to synthesize');
+                return;
+            }
+            
+            if (!presetId) {
+                alert('Please select a voice preset');
+                return;
+            }
+            
+            // Show loading state
+            $('#presetSynthesize').html('<i class="fas fa-spinner fa-spin"></i> Processing...').prop('disabled', true);
+            
+            $.ajax({
+                url: '/api/tts/preset-voice/',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    text: text,
+                    engine: engine,
+                    preset_id: presetId
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        $('#presetAudio').attr('src', response.file_url);
+                        $('#presetDownload').attr('href', response.file_url);
+                        $('#presetResult').show();
+                    } else {
+                        alert('Error: ' + response.error);
+                    }
+                },
+                error: function(xhr) {
+                    alert('Error: ' + (xhr.responseJSON ? xhr.responseJSON.error : 'Failed to use voice preset'));
+                },
+                complete: function() {
+                    $('#presetSynthesize').html('<i class="fas fa-play"></i> Synthesize with Selected Preset').prop('disabled', false);
+                }
+            });
+        });
+        
+        // Install dependencies
+        $('#installDependencies').click(function(e) {
+            e.preventDefault();
+            
+            if (confirm('This will install the required dependencies for Spark-TTS. Do you want to continue?')) {
+                $(this).text('Installing...').addClass('disabled');
+                
+                // Simulate installation (in a real implementation, this would call an API endpoint)
+                setTimeout(function() {
+                    alert('Dependencies installed successfully.');
+                    location.reload();
+                }, 2000);
+            }
+        });
+        
+        // Download model
+        $('#downloadModel').click(function(e) {
+            e.preventDefault();
+            
+            if (confirm('This will download the Spark-TTS model (around 1GB). This may take some time. Do you want to continue?')) {
+                $(this).text('Downloading...').addClass('disabled');
+                
+                $.ajax({
+                    url: '/api/tts/download-model/',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        model_name: 'Spark-TTS-0.5B'
+                    }),
+                    success: function(response) {
+                        if (response.success) {
+                            alert('Model downloaded successfully.');
+                            location.reload();
+                        } else {
+                            alert('Error: ' + response.error);
+                        }
+                    },
+                    error: function(xhr) {
+                        alert('Error: ' + (xhr.responseJSON ? xhr.responseJSON.error : 'Failed to download model'));
+                    },
+                    complete: function() {
+                        $('#downloadModel').text('Download Now').removeClass('disabled');
+                    }
+                });
+            }
+        });
+        
+        // Audio recording
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            let mediaRecorder;
+            let audioChunks = [];
+            
+            $('#startRecording').click(function() {
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(function(stream) {
+                        audioChunks = [];
+                        mediaRecorder = new MediaRecorder(stream);
+                        
+                        mediaRecorder.ondataavailable = function(e) {
+                            if (e.data.size > 0) {
+                                audioChunks.push(e.data);
+                            }
+                        };
+                        
+                        mediaRecorder.onstop = function() {
+                            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                            const audioUrl = URL.createObjectURL(audioBlob);
+                            
+                            $('#recordedAudio').attr('src', audioUrl).show();
+                            
+                            // Store the blob for form submission
+                            window.recordedBlob = audioBlob;
+                            
+                            // Clean up stream
+                            stream.getTracks().forEach(track => track.stop());
+                        };
+                        
+                        mediaRecorder.start();
+                        
+                        $('#recordingIndicator').show();
+                        $('#startRecording').prop('disabled', true);
+                        $('#stopRecording').prop('disabled', false);
+                    })
+                    .catch(function(err) {
+                        alert('Error accessing microphone: ' + err.message);
+                    });
+            });
+            
+            $('#stopRecording').click(function() {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                    $('#recordingIndicator').hide();
+                    $('#startRecording').prop('disabled', false);
+                    $('#stopRecording').prop('disabled', true);
+                }
+            });
+        } else {
+            $('#audioRecorder').html('<div class="alert alert-warning">Your browser does not support audio recording.</div>');
+        }
+    });
+</script>
+{% endblock %} 

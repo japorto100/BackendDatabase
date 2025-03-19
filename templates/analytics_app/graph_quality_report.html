@@ -1,0 +1,426 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Knowledge Graph Quality Report{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'analytics_app/css/graph_quality.css' %}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1>Knowledge Graph Quality Report</h1>
+            
+            <!-- Graph Selector -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="card-title mb-0">Select Knowledge Graph</h3>
+                </div>
+                <div class="card-body">
+                    <form method="get" action="{% url 'graph_quality_report' 'select' %}">
+                        <div class="form-group">
+                            <select name="graph_id" class="form-control">
+                                <option value="">-- Select a Knowledge Graph --</option>
+                                {% for graph in available_graphs %}
+                                <option value="{{ graph.id }}" {% if graph.id == graph_id %}selected{% endif %}>
+                                    {{ graph.name }} ({{ graph.entity_count }} entities, {{ graph.relationship_count }} relationships)
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-2">View Report</button>
+                    </form>
+                </div>
+            </div>
+            
+            {% if graph_id %}
+            <!-- Summary Metrics -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-header">Entities</div>
+                        <div class="card-body">
+                            <h3>{{ metrics.structural.entity_count }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-header">Relationships</div>
+                        <div class="card-body">
+                            <h3>{{ metrics.structural.relationship_count }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-header">Density</div>
+                        <div class="card-body">
+                            <h3>{{ metrics.structural.density|floatformat:4 }}</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-header">Ontological Consistency</div>
+                        <div class="card-body">
+                            <h3>{{ metrics.semantic.ontological_consistency|floatformat:2 }}</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Structural Metrics -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3 class="card-title">Structural Metrics</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4>Entity Types Distribution</h4>
+                            <canvas id="entityTypesChart"></canvas>
+                            <table class="table table-sm mt-3">
+                                <thead>
+                                    <tr>
+                                        <th>Entity Type</th>
+                                        <th>Count</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for type, count in metrics.structural.entity_types.items %}
+                                    <tr>
+                                        <td>{{ type }}</td>
+                                        <td>{{ count }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h4>Relationship Types Distribution</h4>
+                            <canvas id="relationshipTypesChart"></canvas>
+                            <table class="table table-sm mt-3">
+                                <thead>
+                                    <tr>
+                                        <th>Relationship Type</th>
+                                        <th>Count</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for type, count in metrics.structural.relationship_types.items %}
+                                    <tr>
+                                        <td>{{ type }}</td>
+                                        <td>{{ count }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-md-3">
+                            <div class="metric-box">
+                                <h5>Density</h5>
+                                <p class="metric-value">{{ metrics.structural.density|floatformat:4 }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-box">
+                                <h5>Connectivity</h5>
+                                <p class="metric-value">{{ metrics.structural.connectivity|floatformat:2 }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-box">
+                                <h5>Avg. Degree</h5>
+                                <p class="metric-value">{{ metrics.structural.avg_degree|floatformat:2 }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="metric-box">
+                                <h5>Isolated Entities</h5>
+                                <p class="metric-value">{{ metrics.structural.isolated_entities_count }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Semantic Quality -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3 class="card-title">Semantic Quality</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <canvas id="semanticChart"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Metric</th>
+                                        <th>Value</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Ontological Consistency</td>
+                                        <td>{{ metrics.semantic.ontological_consistency|floatformat:2 }}</td>
+                                        <td>
+                                            {% if metrics.semantic.ontological_consistency >= 0.9 %}
+                                            <span class="badge bg-success">Good</span>
+                                            {% elif metrics.semantic.ontological_consistency >= 0.7 %}
+                                            <span class="badge bg-warning">Fair</span>
+                                            {% else %}
+                                            <span class="badge bg-danger">Poor</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Schema Completeness</td>
+                                        <td>{{ metrics.semantic.schema_completeness|floatformat:2 }}</td>
+                                        <td>
+                                            {% if metrics.semantic.schema_completeness >= 0.9 %}
+                                            <span class="badge bg-success">Good</span>
+                                            {% elif metrics.semantic.schema_completeness >= 0.7 %}
+                                            <span class="badge bg-warning">Fair</span>
+                                            {% else %}
+                                            <span class="badge bg-danger">Poor</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Interlinking Degree</td>
+                                        <td>{{ metrics.semantic.interlinking_degree|floatformat:2 }}</td>
+                                        <td>
+                                            {% if metrics.semantic.interlinking_degree >= 0.8 %}
+                                            <span class="badge bg-success">Good</span>
+                                            {% elif metrics.semantic.interlinking_degree >= 0.5 %}
+                                            <span class="badge bg-warning">Fair</span>
+                                            {% else %}
+                                            <span class="badge bg-danger">Poor</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Performance Metrics -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3 class="card-title">Performance Metrics</h3>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Operation</th>
+                                <th>Average Time (ms)</th>
+                                <th>Success Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for operation, stats in metrics.performance.operation_stats.items %}
+                            <tr>
+                                <td>{{ operation }}</td>
+                                <td>{{ stats.avg_time_ms|floatformat:2 }}</td>
+                                <td>{{ stats.success_rate|floatformat:1 }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- User-Oriented Metrics -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3 class="card-title">User-Oriented Metrics</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h4>Query Performance</h4>
+                            <table class="table">
+                                <tr>
+                                    <td>Average Query Time</td>
+                                    <td>{{ metrics.user_oriented.avg_query_time|floatformat:2 }} ms</td>
+                                </tr>
+                                <tr>
+                                    <td>Path Discovery Success Rate</td>
+                                    <td>{{ metrics.user_oriented.path_discovery_rate|floatformat:2 }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h4>Data Quality</h4>
+                            <table class="table">
+                                <tr>
+                                    <td>External KB Link Rate</td>
+                                    <td>{{ metrics.user_oriented.external_link_rate|floatformat:2 }}</td>
+                                </tr>
+                                <tr>
+                                    <td>Entity Resolution Rate</td>
+                                    <td>{{ metrics.user_oriented.entity_resolution_rate|floatformat:2 }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quality Recommendations -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3 class="card-title">Quality Improvement Recommendations</h3>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        {% if metrics.structural.isolated_entities_count > 0 %}
+                        <li class="list-group-item list-group-item-warning">
+                            <i class="fas fa-exclamation-triangle"></i> 
+                            Found {{ metrics.structural.isolated_entities_count }} isolated entities without relationships. Consider connecting these entities to improve graph connectivity.
+                        </li>
+                        {% endif %}
+                        
+                        {% if metrics.semantic.schema_completeness < 0.8 %}
+                        <li class="list-group-item list-group-item-warning">
+                            <i class="fas fa-exclamation-triangle"></i> 
+                            Overall schema completeness is below 80%. Consider adding more properties to entities to improve completeness.
+                        </li>
+                        {% endif %}
+                        
+                        {% if metrics.semantic.ontological_consistency < 0.9 %}
+                        <li class="list-group-item list-group-item-danger">
+                            <i class="fas fa-times-circle"></i> 
+                            Found ontology violations. Review entity and relationship types to ensure they conform to the defined ontology.
+                        </li>
+                        {% endif %}
+                        
+                        {% if metrics.structural.avg_degree < 2 %}
+                        <li class="list-group-item list-group-item-warning">
+                            <i class="fas fa-exclamation-triangle"></i> 
+                            Low average degree ({{ metrics.structural.avg_degree|floatformat:2 }}). Consider adding more relationships between entities to improve graph connectivity.
+                        </li>
+                        {% endif %}
+                        
+                        {% if metrics.structural.density < 0.05 %}
+                        <li class="list-group-item list-group-item-info">
+                            <i class="fas fa-info-circle"></i> 
+                            Graph density is low ({{ metrics.structural.density|floatformat:3 }}). This may be normal for large graphs, but consider if more connections are needed.
+                        </li>
+                        {% endif %}
+                        
+                        {% if metrics.user_oriented.external_link_rate < 0.3 %}
+                        <li class="list-group-item list-group-item-info">
+                            <i class="fas fa-info-circle"></i> 
+                            Low external knowledge base linking rate. Consider enriching entities with external KB references.
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    {% if graph_id %}
+    // Entity Types Chart
+    const entityTypesCtx = document.getElementById('entityTypesChart').getContext('2d');
+    const entityTypes = {% if metrics.structural.entity_types %}JSON.parse('{{ metrics.structural.entity_types|safe|escapejs }}'){% else %}{} {% endif %};
+    new Chart(entityTypesCtx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(entityTypes),
+            datasets: [{
+                data: Object.values(entityTypes),
+                backgroundColor: [
+                    '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b',
+                    '#5a5c69', '#858796', '#f8f9fc', '#d1d3e2', '#b7b9cc'
+                ]
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            responsive: true
+        }
+    });
+    
+    // Relationship Types Chart
+    const relationshipTypesCtx = document.getElementById('relationshipTypesChart').getContext('2d');
+    const relationshipTypes = {% if metrics.structural.relationship_types %}JSON.parse('{{ metrics.structural.relationship_types|safe|escapejs }}'){% else %}{} {% endif %};
+    new Chart(relationshipTypesCtx, {
+        type: 'pie',
+        data: {
+            labels: Object.keys(relationshipTypes),
+            datasets: [{
+                data: Object.values(relationshipTypes),
+                backgroundColor: [
+                    '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b',
+                    '#5a5c69', '#858796', '#f8f9fc', '#d1d3e2', '#b7b9cc'
+                ]
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            responsive: true
+        }
+    });
+    
+    // Semantic Metrics Chart
+    const semanticCtx = document.getElementById('semanticChart').getContext('2d');
+    const semanticMetrics = {
+        ontologicalConsistency: {% if metrics.semantic.ontological_consistency %}{{ metrics.semantic.ontological_consistency }}{% else %}0{% endif %},
+        schemaCompleteness: {% if metrics.semantic.schema_completeness %}{{ metrics.semantic.schema_completeness }}{% else %}0{% endif %},
+        interlinkingDegree: {% if metrics.semantic.interlinking_degree %}{{ metrics.semantic.interlinking_degree }}{% else %}0{% endif %}
+    };
+    new Chart(semanticCtx, {
+        type: 'radar',
+        data: {
+            labels: ['Ontological Consistency', 'Schema Completeness', 'Interlinking Degree'],
+            datasets: [{
+                label: 'Semantic Quality',
+                data: [
+                    semanticMetrics.ontologicalConsistency,
+                    semanticMetrics.schemaCompleteness,
+                    semanticMetrics.interlinkingDegree
+                ],
+                backgroundColor: 'rgba(78, 115, 223, 0.2)',
+                borderColor: 'rgba(78, 115, 223, 1)',
+                pointBackgroundColor: 'rgba(78, 115, 223, 1)',
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: 'rgba(78, 115, 223, 1)'
+            }]
+        },
+        options: {
+            maintainAspectRatio: false,
+            responsive: true,
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: 1
+                }
+            }
+        }
+    });
+    {% endif %}
+</script>
+{% endblock %}

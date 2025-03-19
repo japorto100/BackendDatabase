@@ -1,0 +1,311 @@
+{% extends 'base.html' %}
+
+{% block title %}Search - LocalGPT Vision{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2>Search</h2>
+        <p class="text-muted">Search through your chats, files, and more</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <form id="search-form">
+                    <div class="input-group mb-3">
+                        <input type="text" id="search-query" class="form-control" placeholder="Search for anything..." aria-label="Search query">
+                        <button class="btn btn-primary" type="submit">Search</button>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Content Types</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="messages" id="filter-messages" checked>
+                                    <label class="form-check-label" for="filter-messages">
+                                        Messages
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="files" id="filter-files" checked>
+                                    <label class="form-check-label" for="filter-files">
+                                        Files
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="sessions" id="filter-sessions" checked>
+                                    <label class="form-check-label" for="filter-sessions">
+                                        Chat Sessions
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Date Range</label>
+                                <div class="input-group mb-2">
+                                    <span class="input-group-text">From</span>
+                                    <input type="date" id="filter-date-start" class="form-control">
+                                </div>
+                                <div class="input-group">
+                                    <span class="input-group-text">To</span>
+                                    <input type="date" id="filter-date-end" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="search-results" class="d-none">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h3>Search Results <span id="result-count" class="badge bg-primary">0</span></h3>
+        </div>
+    </div>
+    
+    <!-- Messages Results -->
+    <div id="messages-results-section" class="mb-4 d-none">
+        <div class="row">
+            <div class="col-md-12">
+                <h4>Messages</h4>
+                <div class="list-group" id="messages-results">
+                    <!-- Messages will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Files Results -->
+    <div id="files-results-section" class="mb-4 d-none">
+        <div class="row">
+            <div class="col-md-12">
+                <h4>Files</h4>
+                <div class="row" id="files-results">
+                    <!-- Files will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sessions Results -->
+    <div id="sessions-results-section" class="mb-4 d-none">
+        <div class="row">
+            <div class="col-md-12">
+                <h4>Chat Sessions</h4>
+                <div class="list-group" id="sessions-results">
+                    <!-- Sessions will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="no-results" class="d-none">
+    <div class="row">
+        <div class="col-md-12 text-center">
+            <div class="alert alert-info">
+                <h4>No results found</h4>
+                <p>Try a different search query or adjust your filters.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="loading" class="d-none">
+    <div class="row">
+        <div class="col-md-12 text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Searching...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Handle search form submission
+        $('#search-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const query = $('#search-query').val().trim();
+            if (!query) {
+                alert('Please enter a search query');
+                return;
+            }
+            
+            // Get selected content types
+            const contentTypes = [];
+            if ($('#filter-messages').is(':checked')) contentTypes.push('messages');
+            if ($('#filter-files').is(':checked')) contentTypes.push('files');
+            if ($('#filter-sessions').is(':checked')) contentTypes.push('sessions');
+            
+            // Get date range
+            const dateRange = {};
+            const startDate = $('#filter-date-start').val();
+            const endDate = $('#filter-date-end').val();
+            
+            if (startDate) dateRange.start = startDate;
+            if (endDate) dateRange.end = endDate;
+            
+            // Prepare filters
+            const filters = {
+                content_types: contentTypes,
+                date_range: Object.keys(dateRange).length > 0 ? dateRange : null
+            };
+            
+            // Show loading indicator
+            $('#search-results').addClass('d-none');
+            $('#no-results').addClass('d-none');
+            $('#loading').removeClass('d-none');
+            
+            // Send search request
+            $.ajax({
+                url: '/api/search/',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    query: query,
+                    filters: filters
+                }),
+                success: function(response) {
+                    // Hide loading indicator
+                    $('#loading').addClass('d-none');
+                    
+                    // Update result count
+                    $('#result-count').text(response.results.total_count);
+                    
+                    if (response.results.total_count > 0) {
+                        // Show results
+                        $('#search-results').removeClass('d-none');
+                        
+                        // Display message results
+                        if (response.results.messages.length > 0) {
+                            $('#messages-results-section').removeClass('d-none');
+                            displayMessageResults(response.results.messages);
+                        } else {
+                            $('#messages-results-section').addClass('d-none');
+                        }
+                        
+                        // Display file results
+                        if (response.results.files.length > 0) {
+                            $('#files-results-section').removeClass('d-none');
+                            displayFileResults(response.results.files);
+                        } else {
+                            $('#files-results-section').addClass('d-none');
+                        }
+                        
+                        // Display session results
+                        if (response.results.sessions.length > 0) {
+                            $('#sessions-results-section').removeClass('d-none');
+                            displaySessionResults(response.results.sessions);
+                        } else {
+                            $('#sessions-results-section').addClass('d-none');
+                        }
+                    } else {
+                        // Show no results message
+                        $('#no-results').removeClass('d-none');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    // Hide loading indicator
+                    $('#loading').addClass('d-none');
+                    
+                    // Show error message
+                    alert('Error performing search: ' + error);
+                }
+            });
+        });
+        
+        // Display message results
+        function displayMessageResults(messages) {
+            const container = $('#messages-results');
+            container.empty();
+            
+            messages.forEach(function(message) {
+                const item = $('<a></a>')
+                    .addClass('list-group-item list-group-item-action')
+                    .attr('href', '/chat/' + message.session_id)
+                    .html(`
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">${message.session_title}</h5>
+                            <small>${formatDate(message.timestamp)}</small>
+                        </div>
+                        <p class="mb-1">${message.content}</p>
+                        <small>Role: ${message.role}</small>
+                    `);
+                
+                container.append(item);
+            });
+        }
+        
+        // Display file results
+        function displayFileResults(files) {
+            const container = $('#files-results');
+            container.empty();
+            
+            files.forEach(function(file) {
+                const card = $('<div></div>')
+                    .addClass('col-md-4 mb-3')
+                    .html(`
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">${file.file_name}</h5>
+                                <h6 class="card-subtitle mb-2 text-muted">${file.file_type}</h6>
+                                <p class="card-text">Uploaded: ${formatDate(file.upload_date)}</p>
+                                <p class="card-text">
+                                    <span class="badge ${file.processed ? 'bg-success' : 'bg-warning'}">
+                                        ${file.processed ? 'Processed' : 'Processing'}
+                                    </span>
+                                </p>
+                            </div>
+                            <div class="card-footer">
+                                <a href="/models/files/${file.id}" class="btn btn-sm btn-primary">View Details</a>
+                                ${file.url ? `<a href="${file.url}" class="btn btn-sm btn-secondary" target="_blank">Download</a>` : ''}
+                            </div>
+                        </div>
+                    `);
+                
+                container.append(card);
+            });
+        }
+        
+        // Display session results
+        function displaySessionResults(sessions) {
+            const container = $('#sessions-results');
+            container.empty();
+            
+            sessions.forEach(function(session) {
+                const item = $('<a></a>')
+                    .addClass('list-group-item list-group-item-action')
+                    .attr('href', '/chat/' + session.id)
+                    .html(`
+                        <div class="d-flex w-100 justify-content-between">
+                            <h5 class="mb-1">${session.title}</h5>
+                            <small>${formatDate(session.created_at)}</small>
+                        </div>
+                        <p class="mb-1">Messages: ${session.message_count}</p>
+                    `);
+                
+                container.append(item);
+            });
+        }
+        
+        // Format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+    });
+</script>
+{% endblock %} 

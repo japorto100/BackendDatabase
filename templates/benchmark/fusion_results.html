@@ -1,0 +1,274 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+<style>
+    .fusion-dashboard {
+        padding: 20px;
+    }
+    
+    .chart-container {
+        width: 100%;
+        height: 400px;
+        margin-bottom: 30px;
+    }
+    
+    .metrics-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 30px;
+    }
+    
+    .metrics-table th, .metrics-table td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+    
+    .metrics-table th {
+        background-color: #f2f2f2;
+    }
+    
+    .metrics-table tr:nth-child(even) {
+        background-color: #f9f9f9;
+    }
+    
+    .recommendation-card {
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 15px;
+        background-color: #f9f9f9;
+    }
+    
+    .recommendation-card h4 {
+        margin-top: 0;
+        color: #333;
+    }
+    
+    .confidence-high {
+        color: green;
+    }
+    
+    .confidence-medium {
+        color: orange;
+    }
+    
+    .confidence-low {
+        color: red;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fusion-dashboard">
+    <h1>Fusion Strategy Benchmark Results</h1>
+    
+    <div class="module">
+        <h2>Performance by Strategy</h2>
+        <div class="chart-container">
+            <canvas id="strategyPerformanceChart"></canvas>
+        </div>
+        
+        <table class="metrics-table">
+            <thead>
+                <tr>
+                    <th>Strategy</th>
+                    <th>Avg. Processing Time (ms)</th>
+                    <th>Avg. Memory Usage (MB)</th>
+                    <th>Avg. Quality Score</th>
+                    <th>Usage Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for strategy, metrics in strategy_stats.items %}
+                <tr>
+                    <td>{{ strategy|title }}</td>
+                    <td>{{ metrics.time.mean|floatformat:2 }}</td>
+                    <td>{{ metrics.memory.mean|floatformat:2 }}</td>
+                    <td>{{ metrics.quality.mean|floatformat:2 }}</td>
+                    <td>{{ metrics.time.count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="module">
+        <h2>Performance by Document Type</h2>
+        <div class="chart-container">
+            <canvas id="documentTypeChart"></canvas>
+        </div>
+        
+        <table class="metrics-table">
+            <thead>
+                <tr>
+                    <th>Document Type</th>
+                    <th>Best Strategy</th>
+                    <th>Avg. Quality Score</th>
+                    <th>Avg. Processing Time (ms)</th>
+                    <th>Sample Size</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for doc_type, recommendation in recommendations.items %}
+                <tr>
+                    <td>{{ doc_type|title }}</td>
+                    <td>{{ recommendation.recommended_strategy|title }}</td>
+                    <td>{{ recommendation.confidence|floatformat:2 }}</td>
+                    <td>
+                        {% with doc_stats=document_stats|get_item:doc_type %}
+                            {% with strategy_stats=doc_stats|get_item:recommendation.recommended_strategy %}
+                                {{ strategy_stats.time.mean|floatformat:2 }}
+                            {% endwith %}
+                        {% endwith %}
+                    </td>
+                    <td>{{ recommendation.sample_size }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="module">
+        <h2>Strategy Recommendations</h2>
+        
+        {% for doc_type, recommendation in recommendations.items %}
+        <div class="recommendation-card">
+            <h4>{{ doc_type|title }} Documents</h4>
+            <p>
+                <strong>Recommended Strategy:</strong> {{ recommendation.recommended_strategy|title }}<br>
+                <strong>Confidence:</strong> 
+                <span class="{% if recommendation.confidence > 0.8 %}confidence-high{% elif recommendation.confidence > 0.6 %}confidence-medium{% else %}confidence-low{% endif %}">
+                    {{ recommendation.confidence|floatformat:2 }}
+                </span><br>
+                <strong>Sample Size:</strong> {{ recommendation.sample_size }} documents
+            </p>
+            <p>
+                {% with doc_stats=document_stats|get_item:doc_type %}
+                    {% with strategy_stats=doc_stats|get_item:recommendation.recommended_strategy %}
+                        <strong>Avg. Processing Time:</strong> {{ strategy_stats.time.mean|floatformat:2 }} ms<br>
+                        <strong>Avg. Memory Usage:</strong> {{ strategy_stats.memory.mean|floatformat:2 }} MB
+                    {% endwith %}
+                {% endwith %}
+            </p>
+        </div>
+        {% empty %}
+        <p>No recommendations available yet. Run more benchmarks to generate recommendations.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Strategy Performance Chart
+        const strategyCtx = document.getElementById('strategyPerformanceChart').getContext('2d');
+        const strategyChart = new Chart(strategyCtx, {
+            type: 'radar',
+            data: {
+                labels: ['Processing Time (lower is better)', 'Memory Usage (lower is better)', 'Quality Score', 'Confidence Score'],
+                datasets: [
+                    {% for strategy, metrics in strategy_stats.items %}
+                    {
+                        label: '{{ strategy|title }}',
+                        data: [
+                            // Invert time and memory so lower is better on the chart
+                            {{ 1000 }} - {{ metrics.time.mean|floatformat:2 }},
+                            {{ 100 }} - {{ metrics.memory.mean|floatformat:2 }},
+                            {{ metrics.quality.mean|floatformat:2 }} * 100,
+                            {% with conf_sum=0 conf_count=0 %}
+                                {% for entry in performance_history|get_item:strategy %}
+                                    {% with conf_sum=conf_sum|add:entry.quality conf_count=conf_count|add:1 %}{% endwith %}
+                                {% endfor %}
+                                {% if conf_count > 0 %}
+                                    {{ conf_sum|floatformat:2 }} / {{ conf_count }} * 100
+                                {% else %}
+                                    0
+                                {% endif %}
+                            {% endwith %}
+                        ],
+                        fill: true,
+                        backgroundColor: '{{ strategy|get_color:0.2 }}',
+                        borderColor: '{{ strategy|get_color:1 }}',
+                        pointBackgroundColor: '{{ strategy|get_color:1 }}',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '{{ strategy|get_color:1 }}'
+                    },
+                    {% endfor %}
+                ]
+            },
+            options: {
+                scales: {
+                    r: {
+                        angleLines: {
+                            display: true
+                        },
+                        suggestedMin: 0,
+                        suggestedMax: 100
+                    }
+                }
+            }
+        });
+        
+        // Document Type Chart
+        const docTypeCtx = document.getElementById('documentTypeChart').getContext('2d');
+        const docTypeChart = new Chart(docTypeCtx, {
+            type: 'bar',
+            data: {
+                labels: [{% for doc_type in document_stats.keys %}'{{ doc_type|title }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+                datasets: [
+                    {
+                        label: 'Quality Score by Document Type',
+                        data: [
+                            {% for doc_type, strategies in document_stats.items %}
+                                {% with recommendation=recommendations|get_item:doc_type %}
+                                    {% if recommendation %}
+                                        {{ recommendation.confidence|floatformat:2 }}
+                                    {% else %}
+                                        0
+                                    {% endif %}
+                                {% endwith %}
+                                {% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                        ],
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Processing Time (ms, scaled)',
+                        data: [
+                            {% for doc_type, strategies in document_stats.items %}
+                                {% with recommendation=recommendations|get_item:doc_type %}
+                                    {% if recommendation %}
+                                        {% with strategy=recommendation.recommended_strategy %}
+                                            {% with strategy_stats=strategies|get_item:strategy %}
+                                                {{ strategy_stats.time.mean|floatformat:2 }} / 10
+                                            {% endwith %}
+                                        {% endwith %}
+                                    {% else %}
+                                        0
+                                    {% endif %}
+                                {% endwith %}
+                                {% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                        ],
+                        backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %} 

@@ -1,0 +1,1427 @@
+openapi: 3.0.0
+info:
+  title: LocalGPT Vision API
+  version: 1.0.0
+  description: API for LocalGPT Vision, a Django-based backend for AI chat and vision applications
+
+servers:
+  - url: http://localhost:8000/api
+    description: Development server
+
+paths:
+  /chat/sessions/:
+    get:
+      summary: List chat sessions
+      description: Get a list of all chat sessions for the authenticated user
+      tags:
+        - Chat
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: A list of chat sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatSession'
+    post:
+      summary: Create a new chat session
+      description: Create a new chat session for the authenticated user
+      tags:
+        - Chat
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  description: Title of the chat session
+              required:
+                - title
+      responses:
+        '201':
+          description: Chat session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSession'
+
+  /chat/sessions/{session_id}/:
+    get:
+      summary: Get chat session details
+      description: Get details of a specific chat session
+      tags:
+        - Chat
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Chat session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSession'
+    delete:
+      summary: Delete a chat session
+      description: Delete a specific chat session
+      tags:
+        - Chat
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Chat session deleted
+
+  /chat/sessions/{session_id}/messages/:
+    get:
+      summary: List messages in a chat session
+      description: Get a list of all messages in a specific chat session
+      tags:
+        - Chat
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: A list of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+    post:
+      summary: Send a message in a chat session
+      description: Send a new message in a specific chat session and get AI response
+      tags:
+        - Chat
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  description: Message content
+                model_id:
+                  type: string
+                  description: ID of the AI model to use (optional)
+                file_id:
+                  type: string
+                  format: uuid
+                  description: ID of an uploaded file to include (optional)
+              required:
+                - message
+      responses:
+        '201':
+          description: Message sent and AI response received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_message:
+                    $ref: '#/components/schemas/Message'
+                  ai_response:
+                    $ref: '#/components/schemas/Message'
+
+  /models/files/:
+    get:
+      summary: List uploaded files
+      description: Get a list of all files uploaded by the authenticated user
+      tags:
+        - Files
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: A list of uploaded files
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UploadedFile'
+    post:
+      summary: Upload a file
+      description: Upload a new file for processing
+      tags:
+        - Files
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: File to upload
+                file_type:
+                  type: string
+                  description: Type of file (document, image, video, audio)
+              required:
+                - file
+                - file_type
+      responses:
+        '201':
+          description: File uploaded and processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadedFile'
+
+  /models/files/{file_id}/:
+    get:
+      summary: Get file details
+      description: Get details of a specific uploaded file
+      tags:
+        - Files
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: File details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadedFile'
+    delete:
+      summary: Delete a file
+      description: Delete a specific uploaded file
+      tags:
+        - Files
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: File deleted
+
+  /search/:
+    post:
+      summary: Search content
+      description: Search for content matching a query
+      tags:
+        - Search
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  description: Search query
+                filters:
+                  type: object
+                  description: Search filters (optional)
+              required:
+                - query
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  query:
+                    type: string
+                  filters:
+                    type: object
+                  results:
+                    type: object
+                    properties:
+                      messages:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Message'
+                      files:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/UploadedFile'
+                      sessions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ChatSession'
+                      total_count:
+                        type: integer
+
+  /users/profile/:
+    get:
+      summary: Get user profile
+      description: Get the profile of the authenticated user
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+    patch:
+      summary: Update user profile
+      description: Update the profile of the authenticated user
+      tags:
+        - Users
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfileUpdate'
+      responses:
+        '200':
+          description: User profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+
+  /auth/token/:
+    post:
+      summary: Get authentication token
+      description: Get a JWT token for authentication
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username
+                - password
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access:
+                    type: string
+                    description: JWT access token
+                  refresh:
+                    type: string
+                    description: JWT refresh token
+
+  /auth/token/refresh/:
+    post:
+      summary: Refresh authentication token
+      description: Get a new JWT token using a refresh token
+      tags:
+        - Authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh:
+                  type: string
+                  description: JWT refresh token
+              required:
+                - refresh
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access:
+                    type: string
+                    description: New JWT access token
+
+  /api/debug/performance:
+    get:
+      summary: Get performance metrics
+      description: Retrieve performance metrics for API monitoring
+      tags:
+        - Debug
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Performance metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  avgResponseTime:
+                    type: number
+                  messageCount:
+                    type: integer
+                  tokenUsage:
+                    type: integer
+                  cacheHitRate:
+                    type: number
+                  dbQueryCount:
+                    type: integer
+                  memoryUsage:
+                    type: integer
+                  activeConnections:
+                    type: integer
+                  wsLatency:
+                    type: number
+                  apiCallsPerMinute:
+                    type: number
+                  errorRate:
+                    type: number
+
+  /api/debug/system:
+    get:
+      summary: Get system status
+      description: Retrieve system status information
+      tags:
+        - Debug
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: System status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dbStatus:
+                    type: object
+                    properties:
+                      connections:
+                        type: integer
+                      queryLog:
+                        type: array
+                        items:
+                          type: object
+                      slowQueries:
+                        type: array
+                        items:
+                          type: object
+                      indexUsage:
+                        type: object
+                  cacheStatus:
+                    type: object
+                    properties:
+                      size:
+                        type: integer
+                      hits:
+                        type: integer
+                      misses:
+                        type: integer
+                      keys:
+                        type: array
+                        items:
+                          type: string
+                  systemStatus:
+                    type: object
+                    properties:
+                      cpu:
+                        type: number
+                      memory:
+                        type: number
+                      uptime:
+                        type: number
+
+  /models/:
+    get:
+      summary: List available AI models
+      description: Get a list of all available AI models
+      tags:
+        - Models
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: A list of available models
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AIModel'
+
+  /chat/sessions/{session_id}/system-message/:
+    put:
+      summary: Update system message
+      description: Update the system message for a chat session
+      tags:
+        - Chat
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                  description: System message content
+              required:
+                - content
+      responses:
+        '200':
+          description: System message updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+
+  /ws/chat/{session_id}/:
+    get:
+      summary: WebSocket connection for real-time chat
+      description: Establish a WebSocket connection for real-time messaging
+      tags:
+        - WebSockets
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '101':
+          description: WebSocket connection established
+
+  /analytics/usage/:
+    get:
+      summary: Get usage statistics
+      description: Get detailed usage statistics for the authenticated user
+      tags:
+        - Analytics
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Usage statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message_count:
+                    type: integer
+                  file_upload_count:
+                    type: integer
+                  token_usage:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      by_model:
+                        type: object
+                  session_count:
+                    type: integer
+                  average_response_time:
+                    type: number
+                  usage_by_date:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                        message_count:
+                          type: integer
+                        token_usage:
+                          type: integer
+
+  /api/documents/process:
+    post:
+      summary: Process a document file
+      description: Upload and process a document to extract text, structure, and metadata
+      tags:
+        - Document Processing
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                options:
+                  type: object
+                  properties:
+                    extract_structure:
+                      type: boolean
+                    extract_metadata:
+                      type: boolean
+      responses:
+        '200':
+          description: Document processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessedDocument'
+
+  # Vision API Endpoints
+  /api/vision/analyze-image/:
+    post:
+      summary: Analyze an image with vision models
+      description: Process an image with various vision models to extract information
+      tags:
+        - Vision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image_url:
+                  type: string
+                  description: URL or path to the image to analyze
+                prompt:
+                  type: string
+                  description: Prompt or question about the image
+                model_id:
+                  type: string
+                  description: ID of the vision model to use
+              required:
+                - image_url
+      responses:
+        '200':
+          description: Image analysis results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisionAnalysisResult'
+
+  /api/vision/analyze-document/:
+    post:
+      summary: Analyze a document with vision capabilities
+      description: Process a document using vision models to extract text and structure
+      tags:
+        - Vision
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                document:
+                  type: string
+                  format: binary
+                  description: Document file to analyze
+                prompt:
+                  type: string
+                  description: Instructions for document analysis
+                model_id:
+                  type: string
+                  description: ID of the vision model to use
+              required:
+                - document
+      responses:
+        '200':
+          description: Document analysis results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentAnalysisResult'
+
+  /api/vision/models/:
+    get:
+      summary: List available vision models
+      description: Get a list of all available vision models
+      tags:
+        - Vision
+      responses:
+        '200':
+          description: A list of available vision models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VisionModel'
+                  default_model:
+                    type: string
+  
+  /api/vision/services/:
+    get:
+      summary: List available vision services
+      description: Get a list of all available vision services with capabilities
+      tags:
+        - Vision
+      responses:
+        '200':
+          description: A list of available vision services
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  services:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VisionService'
+                  default_service:
+                    type: string
+                  device_capabilities:
+                    type: object
+                    properties:
+                      has_gpu:
+                        type: boolean
+                      gpu_name:
+                        type: string
+                      platform:
+                        type: string
+  
+  /api/vision/services/gpt4v/:
+    post:
+      summary: Process an image with GPT-4 Vision
+      description: Process an image using OpenAI's GPT-4 Vision model
+      tags:
+        - Vision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  description: Image data (URL, base64, or file path)
+                prompt:
+                  type: string
+                  description: Prompt or question about the image
+                model:
+                  type: string
+                  description: Specific GPT-4 Vision model to use
+                detail_level:
+                  type: string
+                  enum: [low, high, auto]
+                  description: Level of detail for image analysis
+              required:
+                - image
+      responses:
+        '200':
+          description: GPT-4 Vision analysis results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisionServiceResponse'
+  
+  /api/vision/services/gemini/:
+    post:
+      summary: Process an image with Gemini Vision
+      description: Process an image using Google's Gemini Vision model
+      tags:
+        - Vision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  description: Image data (URL, base64, or file path)
+                prompt:
+                  type: string
+                  description: Prompt or question about the image
+                model:
+                  type: string
+                  description: Specific Gemini Vision model to use
+              required:
+                - image
+      responses:
+        '200':
+          description: Gemini Vision analysis results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisionServiceResponse'
+  
+  /api/vision/services/qwen/:
+    post:
+      summary: Process an image with Qwen Vision
+      description: Process an image using Qwen Vision models
+      tags:
+        - Vision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  description: Image data (URL, base64, or file path)
+                prompt:
+                  type: string
+                  description: Prompt or question about the image
+                model:
+                  type: string
+                  description: Specific Qwen Vision model to use
+              required:
+                - image
+      responses:
+        '200':
+          description: Qwen Vision analysis results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisionServiceResponse'
+  
+  /api/vision/services/lightweight/:
+    post:
+      summary: Process an image with Lightweight Vision models
+      description: Process an image using efficient local vision models
+      tags:
+        - Vision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  description: Image data (URL, base64, or file path)
+                prompt:
+                  type: string
+                  description: Prompt or question about the image
+                model_type:
+                  type: string
+                  enum: [clip, blip, paligemma]
+                  description: Type of lightweight model to use
+              required:
+                - image
+      responses:
+        '200':
+          description: Lightweight Vision analysis results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisionServiceResponse'
+  
+  /api/vision/services/auto-select/:
+    post:
+      summary: Process an image with automatic model selection
+      description: Process an image by automatically selecting the best vision model
+      tags:
+        - Vision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  description: Image data (URL, base64, or file path)
+                prompt:
+                  type: string
+                  description: Prompt or question about the image
+                task:
+                  type: string
+                  enum: [image_understanding, document_processing, visual_qa]
+                  description: Type of task to perform
+              required:
+                - image
+      responses:
+        '200':
+          description: Auto-selected Vision analysis results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AutoSelectVisionResponse'
+  
+  # Text-to-Speech API Endpoints
+  /api/tts/engines/:
+    get:
+      summary: List available TTS engines
+      description: Get a list of all available Text-to-Speech engines
+      tags:
+        - Text-to-Speech
+      responses:
+        '200':
+          description: A list of available TTS engines
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  engines:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TTSEngine'
+  
+  /api/tts/engines/{engine_id}/:
+    get:
+      summary: Get TTS engine details
+      description: Get detailed information about a specific TTS engine
+      tags:
+        - Text-to-Speech
+      parameters:
+        - name: engine_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TTS engine details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TTSEngineDetails'
+  
+  /api/tts/voice-presets/:
+    get:
+      summary: List voice presets for TTS engine
+      description: Get available voice presets for a specific TTS engine
+      tags:
+        - Text-to-Speech
+      parameters:
+        - name: engine
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Available voice presets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  engine:
+                    type: string
+                  presets:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VoicePreset'
+  
+  /api/tts/requirements/:
+    get:
+      summary: Check TTS requirements
+      description: Check if system requirements for TTS are met
+      tags:
+        - Text-to-Speech
+      responses:
+        '200':
+          description: TTS requirements status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, missing_requirements]
+                  requirements:
+                    type: object
+  
+  /api/tts/synthesize/:
+    post:
+      summary: Synthesize speech from text
+      description: Convert text to speech using specified TTS engine
+      tags:
+        - Text-to-Speech
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                  description: Text to synthesize
+                engine:
+                  type: string
+                  description: TTS engine to use
+                options:
+                  type: object
+                  description: Additional synthesis options
+              required:
+                - text
+      responses:
+        '200':
+          description: Speech synthesis results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SynthesisResult'
+  
+  /api/tts/voice-cloning/:
+    post:
+      summary: Clone voice and synthesize speech
+      description: Clone a voice from reference audio and synthesize speech
+      tags:
+        - Text-to-Speech
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+                  description: Text to synthesize
+                reference_audio:
+                  type: string
+                  format: binary
+                  description: Reference audio for voice cloning
+                engine:
+                  type: string
+                  description: TTS engine to use
+                prompt_text:
+                  type: string
+                  description: Optional prompt text for voice cloning
+              required:
+                - text
+                - reference_audio
+      responses:
+        '200':
+          description: Voice cloning results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SynthesisResult'
+
+components:
+  schemas:
+    ChatSession:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        user:
+          type: string
+          format: uuid
+        message_count:
+          type: integer
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        session:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant, system]
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        file_id:
+          type: string
+          format: uuid
+          nullable: true
+        file_type:
+          type: string
+          nullable: true
+
+    UploadedFile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user:
+          type: string
+          format: uuid
+        file:
+          type: string
+          description: File URL
+        file_type:
+          type: string
+          enum: [document, image, video, audio]
+        upload_date:
+          type: string
+          format: date-time
+        processed:
+          type: boolean
+        processing_results:
+          type: object
+
+    UserProfile:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            username:
+              type: string
+            email:
+              type: string
+            first_name:
+              type: string
+            last_name:
+              type: string
+        theme:
+          type: string
+          enum: [light, dark, system]
+        default_model:
+          type: string
+        daily_message_limit:
+          type: integer
+        daily_file_upload_limit:
+          type: integer
+        messages_sent_today:
+          type: integer
+        files_uploaded_today:
+          type: integer
+
+    UserProfileUpdate:
+      type: object
+      properties:
+        theme:
+          type: string
+          enum: [light, dark, system]
+        default_model:
+          type: string
+        openai_api_key:
+          type: string
+        anthropic_api_key:
+          type: string
+
+    AIModel:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        provider:
+          type: string
+          enum: [openai, anthropic, local, deepseek, google]
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum: [text, image, audio, video, code]
+        context_length:
+          type: integer
+        is_default:
+          type: boolean
+        is_available:
+          type: boolean
+
+    ProcessedDocument:
+      type: object
+      properties:
+        text:
+          type: string
+        structure:
+          type: object
+        metadata:
+          type: object
+    
+    # Vision schemas
+    VisionAnalysisResult:
+      type: object
+      properties:
+        response:
+          type: string
+          description: Generated text response about the image
+        confidence:
+          type: number
+          description: Confidence score of the analysis
+        image_url:
+          type: string
+          description: URL of the analyzed image
+        model_used:
+          type: string
+          description: Model used for the analysis
+        
+    DocumentAnalysisResult:
+      type: object
+      properties:
+        response:
+          type: string
+          description: Generated text response about the document
+        confidence:
+          type: number
+          description: Confidence score of the analysis
+        document_name:
+          type: string
+          description: Name of the analyzed document
+        model_used:
+          type: string
+          description: Model used for the analysis
+        metadata:
+          type: object
+          description: Additional metadata about the document
+          
+    VisionModel:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Model identifier
+        name:
+          type: string
+          description: Human-readable model name
+        provider:
+          type: string
+          description: Provider of the model (OpenAI, Google, etc.)
+        max_tokens:
+          type: integer
+          description: Maximum tokens the model can generate
+        capabilities:
+          type: array
+          items:
+            type: string
+            enum: [image_description, visual_qa, document_analysis]
+            
+    VisionService:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Service identifier
+        name:
+          type: string
+          description: Human-readable service name
+        models:
+          type: array
+          items:
+            type: string
+          description: Models available in this service
+        provider:
+          type: string
+          description: Provider of the service
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: Service capabilities
+        requires_api_key:
+          type: boolean
+          description: Whether the service requires an API key
+        requires_gpu:
+          type: boolean
+          description: Whether the service requires GPU
+        available:
+          type: boolean
+          description: Whether the service is available on the current system
+          
+    VisionServiceResponse:
+      type: object
+      properties:
+        response:
+          type: string
+          description: Generated text response
+        confidence:
+          type: number
+          description: Confidence score
+        model:
+          type: string
+          description: Model used for analysis
+          
+    AutoSelectVisionResponse:
+      type: object
+      properties:
+        response:
+          type: string
+          description: Generated text response
+        confidence:
+          type: number
+          description: Confidence score
+        selected_provider:
+          type: string
+          description: Provider that was automatically selected
+        selected_model:
+          type: string
+          description: Model that was automatically selected
+        task:
+          type: string
+          description: Task that was performed
+        device_capabilities:
+          type: object
+          properties:
+            has_gpu:
+              type: boolean
+            gpu_name:
+              type: string
+            platform:
+              type: string
+              
+    # TTS schemas
+    TTSEngine:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Engine identifier
+        name:
+          type: string
+          description: Human-readable engine name
+        features:
+          type: array
+          items:
+            type: string
+          description: Features supported by the engine
+          
+    TTSEngineDetails:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Engine identifier
+        name:
+          type: string
+          description: Human-readable engine name
+        features:
+          type: array
+          items:
+            type: string
+          description: Features supported by the engine
+        voices:
+          type: array
+          items:
+            type: object
+          description: Available voices for this engine
+        status:
+          type: string
+          description: Status of the engine
+          
+    VoicePreset:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Preset identifier
+        name:
+          type: string
+          description: Human-readable preset name
+          
+    SynthesisResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Whether synthesis was successful
+        file_url:
+          type: string
+          description: URL to the synthesized audio file
+        engine:
+          type: string
+          description: Engine used for synthesis
+        voice_id:
+          type: string
+          description: Voice used for synthesis
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT 

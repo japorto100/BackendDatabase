@@ -1,0 +1,555 @@
+{% extends "base.html" %}
+{% load static %}
+{% load benchmark_filters %}
+
+{% block title %}Benchmark Results: {{ benchmark_run.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/benchmark.css' %}">
+<style>
+  .benchmark-container {
+    margin-top: 20px;
+  }
+  
+  .benchmark-card {
+    background-color: #fff;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    padding: 20px;
+  }
+  
+  .benchmark-header {
+    border-bottom: 1px solid #eee;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+  }
+  
+  .benchmark-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .benchmark-table th,
+  .benchmark-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .benchmark-table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+  }
+  
+  .benchmark-chart {
+    height: 300px;
+    margin-top: 20px;
+  }
+  
+  .model-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-right: 5px;
+    margin-bottom: 5px;
+    background-color: #e0e0e0;
+  }
+  
+  .rank-1 {
+    background-color: #ffd700;
+    color: #333;
+  }
+  
+  .rank-2 {
+    background-color: #c0c0c0;
+    color: #333;
+  }
+  
+  .rank-3 {
+    background-color: #cd7f32;
+    color: #fff;
+  }
+  
+  .tab-header {
+    display: flex;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 15px;
+  }
+  
+  .tab-button {
+    padding: 10px 15px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  
+  .tab-button.active {
+    border-bottom: 2px solid #007bff;
+    font-weight: bold;
+  }
+  
+  .tab-content {
+    display: none;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row mb-4">
+    <div class="col">
+      <h1>Benchmark Results: {{ benchmark_run.name }}</h1>
+      <p class="lead">{{ benchmark_run.description }}</p>
+    </div>
+    <div class="col-auto">
+      <a href="{% url 'benchmark_dashboard' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+      </a>
+      <a href="#" class="btn btn-outline-primary" id="export-results">
+        <i class="fas fa-download"></i> Export Results
+      </a>
+    </div>
+  </div>
+
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Benchmark Details</h5>
+          <table class="table table-sm">
+            <tr>
+              <th>Status:</th>
+              <td>
+                <span class="badge {% if benchmark_run.status == 'completed' %}bg-success{% elif benchmark_run.status == 'running' %}bg-primary{% elif benchmark_run.status == 'failed' %}bg-danger{% else %}bg-secondary{% endif %}">
+                  {{ benchmark_run.status }}
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <th>Started:</th>
+              <td>{{ benchmark_run.start_time|date:"M d, Y H:i:s" }}</td>
+            </tr>
+            <tr>
+              <th>Duration:</th>
+              <td>{{ benchmark_run.duration|default:"N/A" }} seconds</td>
+            </tr>
+            <tr>
+              <th>Models:</th>
+              <td>{{ benchmark_run.models_tested|length }}</td>
+            </tr>
+            <tr>
+              <th>Tasks:</th>
+              <td>{{ benchmark_run.tasks.count }}</td>
+            </tr>
+            <tr>
+              <th>Iterations:</th>
+              <td>{{ benchmark_run.iterations }}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Overall Rankings</h5>
+          <div class="table-responsive">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Model</th>
+                  <th>Response Time</th>
+                  <th>Token Efficiency</th>
+                  {% if 'avg_lexical_f1' in summary.rankings %}
+                  <th>Quality</th>
+                  {% endif %}
+                  {% if 'avg_electricity_cost' in summary.rankings %}
+                  <th>Cost</th>
+                  {% endif %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for model_id in benchmark_run.models_tested %}
+                <tr>
+                  <td>{{ model_id }}</td>
+                  {% for item in summary.rankings.avg_response_time_ms %}
+                    {% if item.model_id == model_id %}
+                    <td>{{ item.rank }}</td>
+                    {% endif %}
+                  {% endfor %}
+                  {% for item in summary.rankings.avg_token_efficiency %}
+                    {% if item.model_id == model_id %}
+                    <td>{{ item.rank }}</td>
+                    {% endif %}
+                  {% endfor %}
+                  {% if 'avg_lexical_f1' in summary.rankings %}
+                    {% for item in summary.rankings.avg_lexical_f1 %}
+                      {% if item.model_id == model_id %}
+                      <td>{{ item.rank }}</td>
+                      {% endif %}
+                    {% endfor %}
+                  {% endif %}
+                  {% if 'avg_electricity_cost' in summary.rankings %}
+                    {% for item in summary.rankings.avg_electricity_cost %}
+                      {% if item.model_id == model_id %}
+                      <td>{{ item.rank }}</td>
+                      {% endif %}
+                    {% endfor %}
+                  {% endif %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="benchmark-card">
+    <div class="benchmark-header">
+      <h2>Performance Metrics</h2>
+    </div>
+    
+    <div class="tab-header">
+      <button class="tab-button active" onclick="openTab(event, 'response-time')">Response Time</button>
+      <button class="tab-button" onclick="openTab(event, 'token-efficiency')">Token Efficiency</button>
+      {% if 'avg_lexical_f1' in summary.rankings %}
+      <button class="tab-button" onclick="openTab(event, 'quality')">Quality</button>
+      {% endif %}
+      {% if 'avg_electricity_cost' in summary.rankings %}
+      <button class="tab-button" onclick="openTab(event, 'cost')">Electricity Cost</button>
+      {% endif %}
+    </div>
+    
+    <div class="tab-content-container">
+      <div id="response-time" class="tab-content" style="display: block;">
+        <table class="benchmark-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Model</th>
+              <th>Avg Response Time (ms)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in summary.rankings.avg_response_time_ms %}
+            <tr>
+              <td>{{ item.rank }}</td>
+              <td>
+                <span class="model-badge {% if item.rank <= 3 %}rank-{{ item.rank }}{% endif %}">
+                  {{ item.model_id }}
+                </span>
+              </td>
+              <td>{{ item.value|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="benchmark-chart">
+          <canvas id="response-time-chart"></canvas>
+        </div>
+      </div>
+      
+      <div id="token-efficiency" class="tab-content" style="display: none;">
+        <table class="benchmark-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Model</th>
+              <th>Token Efficiency</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in summary.rankings.avg_token_efficiency %}
+            <tr>
+              <td>{{ item.rank }}</td>
+              <td>
+                <span class="model-badge {% if item.rank <= 3 %}rank-{{ item.rank }}{% endif %}">
+                  {{ item.model_id }}
+                </span>
+              </td>
+              <td>{{ item.value|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="benchmark-chart">
+          <canvas id="token-efficiency-chart"></canvas>
+        </div>
+      </div>
+      
+      {% if 'avg_lexical_f1' in summary.rankings %}
+      <div id="quality" class="tab-content" style="display: none;">
+        <table class="benchmark-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Model</th>
+              <th>F1 Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in summary.rankings.avg_lexical_f1 %}
+            <tr>
+              <td>{{ item.rank }}</td>
+              <td>
+                <span class="model-badge {% if item.rank <= 3 %}rank-{{ item.rank }}{% endif %}">
+                  {{ item.model_id }}
+                </span>
+              </td>
+              <td>{{ item.value|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="benchmark-chart">
+          <canvas id="quality-chart"></canvas>
+        </div>
+      </div>
+      {% endif %}
+      
+      {% if 'avg_electricity_cost' in summary.rankings %}
+      <div id="cost" class="tab-content" style="display: none;">
+        <table class="benchmark-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Model</th>
+              <th>Avg Electricity Cost (CHF)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in summary.rankings.avg_electricity_cost %}
+            <tr>
+              <td>{{ item.rank }}</td>
+              <td>
+                <span class="model-badge {% if item.rank <= 3 %}rank-{{ item.rank }}{% endif %}">
+                  {{ item.model_id }}
+                </span>
+              </td>
+              <td>{{ item.value|floatformat:4 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="benchmark-chart">
+          <canvas id="cost-chart"></canvas>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  
+  <div class="benchmark-card">
+    <div class="benchmark-header">
+      <h2>Task Results</h2>
+    </div>
+    
+    {% for task in benchmark_run.tasks.all %}
+    <div class="task-section">
+      <h3>{{ task.name }} ({{ task.category }})</h3>
+      <p>{{ task.description }}</p>
+      
+      <table class="benchmark-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Response Time (ms)</th>
+            <th>Token Efficiency</th>
+            {% if 'avg_lexical_f1' in summary.rankings %}
+            <th>Quality Score</th>
+            {% endif %}
+            {% if 'avg_electricity_cost' in summary.rankings %}
+            <th>Electricity Cost</th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for model_id in benchmark_run.models_tested %}
+          {% if summary.results|get_item:model_id|get_item:task.id %}
+          <tr>
+            <td>{{ model_id }}</td>
+            <td>{{ summary.results|get_item:model_id|get_item:task.id|get_item:'metrics'|get_item:'avg_response_time_ms'|floatformat:2 }}</td>
+            <td>{{ summary.results|get_item:model_id|get_item:task.id|get_item:'metrics'|get_item:'avg_token_efficiency'|floatformat:2 }}</td>
+            {% if 'avg_lexical_f1' in summary.rankings %}
+            <td>{{ summary.results|get_item:model_id|get_item:task.id|get_item:'metrics'|get_item:'avg_lexical_f1'|floatformat:2 }}</td>
+            {% endif %}
+            {% if 'avg_electricity_cost' in summary.rankings %}
+            <td>{{ summary.results|get_item:model_id|get_item:task.id|get_item:'metrics'|get_item:'avg_electricity_cost'|floatformat:4 }}</td>
+            {% endif %}
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  function openTab(evt, tabName) {
+    var i, tabContent, tabButtons;
+    
+    // Hide all tab content
+    tabContent = document.getElementsByClassName("tab-content");
+    for (i = 0; i < tabContent.length; i++) {
+      tabContent[i].style.display = "none";
+    }
+    
+    // Remove "active" class from all tab buttons
+    tabButtons = document.getElementsByClassName("tab-button");
+    for (i = 0; i < tabButtons.length; i++) {
+      tabButtons[i].className = tabButtons[i].className.replace(" active", "");
+    }
+    
+    // Show the current tab and add "active" class to the button
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.className += " active";
+  }
+  
+  // Initialize charts
+  document.addEventListener('DOMContentLoaded', function() {
+    // Response time chart
+    const responseTimeCtx = document.getElementById('response-time-chart').getContext('2d');
+    const responseTimeData = {
+      labels: [{% for item in summary.rankings.avg_response_time_ms %}'{{ item.model_id }}',{% endfor %}],
+      datasets: [{
+        label: 'Response Time (ms)',
+        data: [{% for item in summary.rankings.avg_response_time_ms %}{{ item.value }},{% endfor %}],
+        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 1
+      }]
+    };
+    new Chart(responseTimeCtx, {
+      type: 'bar',
+      data: responseTimeData,
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+    
+    // Token efficiency chart
+    const tokenEfficiencyCtx = document.getElementById('token-efficiency-chart').getContext('2d');
+    const tokenEfficiencyData = {
+      labels: [{% for item in summary.rankings.avg_token_efficiency %}'{{ item.model_id }}',{% endfor %}],
+      datasets: [{
+        label: 'Token Efficiency',
+        data: [{% for item in summary.rankings.avg_token_efficiency %}{{ item.value }},{% endfor %}],
+        backgroundColor: 'rgba(75, 192, 192, 0.5)',
+        borderColor: 'rgba(75, 192, 192, 1)',
+        borderWidth: 1
+      }]
+    };
+    new Chart(tokenEfficiencyCtx, {
+      type: 'bar',
+      data: tokenEfficiencyData,
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+    
+    // Quality chart (if available)
+    {% if 'avg_lexical_f1' in summary.rankings %}
+    const qualityCtx = document.getElementById('quality-chart').getContext('2d');
+    const qualityData = {
+      labels: [{% for item in summary.rankings.avg_lexical_f1 %}'{{ item.model_id }}',{% endfor %}],
+      datasets: [{
+        label: 'F1 Score',
+        data: [{% for item in summary.rankings.avg_lexical_f1 %}{{ item.value }},{% endfor %}],
+        backgroundColor: 'rgba(153, 102, 255, 0.5)',
+        borderColor: 'rgba(153, 102, 255, 1)',
+        borderWidth: 1
+      }]
+    };
+    new Chart(qualityCtx, {
+      type: 'bar',
+      data: qualityData,
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+    {% endif %}
+    
+    // Cost chart (if available)
+    {% if 'avg_electricity_cost' in summary.rankings %}
+    const costCtx = document.getElementById('cost-chart').getContext('2d');
+    const costData = {
+      labels: [{% for item in summary.rankings.avg_electricity_cost %}'{{ item.model_id }}',{% endfor %}],
+      datasets: [{
+        label: 'Electricity Cost (CHF)',
+        data: [{% for item in summary.rankings.avg_electricity_cost %}{{ item.value }},{% endfor %}],
+        backgroundColor: 'rgba(255, 159, 64, 0.5)',
+        borderColor: 'rgba(255, 159, 64, 1)',
+        borderWidth: 1
+      }]
+    };
+    new Chart(costCtx, {
+      type: 'bar',
+      data: costData,
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+    {% endif %}
+    
+    // Export results
+    document.getElementById('export-results').addEventListener('click', function(e) {
+      e.preventDefault();
+      
+      // Prepare data for export
+      const benchmarkData = {
+        name: '{{ benchmark_run.name }}',
+        description: '{{ benchmark_run.description }}',
+        start_time: '{{ benchmark_run.start_time|date:"c" }}',
+        duration: '{{ benchmark_run.duration }}',
+        models: {{ benchmark_run.models_tested|safe }},
+        tasks: [{% for task in benchmark_run.tasks.all %}{ 
+          id: {{ task.id }}, 
+          name: '{{ task.name }}', 
+          category: '{{ task.category }}' 
+        }{% if not forloop.last %},{% endif %}{% endfor %}],
+        rankings: {{ summary.rankings|safe }},
+        results: {{ summary.results|safe }}
+      };
+      
+      // Create a blob and download
+      const dataStr = JSON.stringify(benchmarkData, null, 2);
+      const blob = new Blob([dataStr], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.setAttribute('hidden', '');
+      a.setAttribute('href', url);
+      a.setAttribute('download', 'benchmark_{{ benchmark_run.id }}_results.json');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+  });
+</script>
+{% endblock %} 

@@ -1,0 +1,77 @@
+.model-selector {
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.model-selector-main {
+  margin-bottom: 16px;
+}
+
+.model-select-container {
+  margin-bottom: 16px;
+}
+
+.model-select-container label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.model-provider {
+  color: #888;
+  margin-left: 6px;
+  font-size: 0.9em;
+}
+
+.vision-badge {
+  background-color: #1890ff;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+  font-size: 0.8em;
+}
+
+.custom-model-container {
+  margin-bottom: 16px;
+}
+
+.custom-url-input {
+  margin-top: 12px;
+}
+
+.advanced-settings {
+  margin-top: 16px;
+}
+
+.advanced-settings-content {
+  background-color: #f0f0f0;
+  padding: 12px;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+.setting-item {
+  margin-bottom: 12px;
+}
+
+.setting-item label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.slider-container {
+  padding: 0 8px;
+}
+
+.slider-container input[type="range"] {
+  width: 100%;
+}
+
+.model-selector-actions {
+  display: flex;
+  justify-content: flex-end;
+} 

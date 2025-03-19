@@ -1,0 +1,278 @@
+# .cursorrules
+
+## Purpose
+
+This file provides Cursor with domain-specific best practices, conventions, and guidelines for writing and structuring code in the following areas:
+1. **Data Analysis & Visualization**  
+2. **Deep Learning, Transformers, Diffusion Models, & LLM Development**  
+3. **Python & Django for Scalable Web Applications**
+
+By placing `.cursorrules` in your project's root directory, you enable Cursor to offer contextual suggestions (Cursor Chat, Ctrl/⌘+K, etc.) that align with your specific development needs. For maximum benefit, tailor these guidelines to reflect your team's coding style, frameworks in use, and project constraints.
+
+---
+
+## General Instructions
+
+1. **PEP 8 Compliance**  
+   - Strictly adhere to PEP 8 for consistent, readable code (e.g., 4-space indentation, descriptive variable names, line length ≤ 79 or 120 as a practical limit).
+
+2. **Concise, Technical Responses**  
+   - Keep function docstrings and comments brief but informative.  
+   - Provide examples that can be immediately copy-pasted and run without errors, especially when illustrating a concept.
+
+3. **Commenting and Documentation**  
+   - Include comments to explain *why* a particular approach is used, not just *what* the code does.  
+   - Use docstrings to describe function arguments, return types, and expected behavior.
+
+4. **Descriptive Naming**  
+   - Use `snake_case` for function names, variables, and file names.  
+   - Use `CamelCase` for class names, especially in OOP-based code (model classes, Django CBVs, PyTorch `nn.Module` subclasses, etc.).  
+   - Align variable names with the data they hold (e.g., `df_sales` for a sales DataFrame, `encoder_outputs` for the output of a transformer encoder).
+
+5. **Avoid Code Duplication**  
+   - Refactor repeated code into reusable functions or classes.  
+   - Centralize configurations, constants, or environment variables in a single location (e.g., a config file).
+
+6. **Project Organization & Version Control**  
+   - Organize code into logical modules and subpackages.  
+   - Use Git or other version control systems to track changes (committing early and often).
+
+7. **Cursor-Specific Usage**  
+   - Use Cursor Chat (e.g., Ctrl/⌘+Shift+P, Ctrl/⌘+K) to quickly generate code snippets and ask clarifying questions about best practices.  
+   - Reference these rules within Cursor Chat to guide suggestions for domain-specific tasks (data analysis, deep learning, Django, etc.).
+
+---
+
+## 1. Data Analysis and Visualization
+
+**Domains**: pandas, NumPy, matplotlib, seaborn, Jupyter Notebook
+
+### Key Principles
+
+1. **Concise & Technical**  
+   - Provide Python examples showcasing data manipulation (e.g., using `pandas` DataFrames).  
+   - Always keep code cells minimal and focused; avoid monolithic code blocks that are hard to debug.
+
+2. **Readability & Reproducibility**  
+   - Use Jupyter Notebooks with clear headings and ordered execution.  
+   - Include markdown cells describing the “why” and “how” of each analysis step.
+
+3. **Functional Programming**  
+   - Avoid unnecessary classes; use functions for data transformations or pipelines.  
+   - Write short, modular functions (e.g., `clean_data(df)`, `plot_histogram(df, column_name)`).
+
+4. **Vectorized Operations**  
+   - Prefer `pandas` or `NumPy` vectorized methods over manual loops for better performance.  
+   - Example: `df["col"] = df["col"].apply(some_function)` rather than iterating rows with `for`.
+
+5. **Descriptive Variable Names**  
+   - Name columns, DataFrames, and variables to reflect the data. e.g., `sales_data`, `summary_stats`.
+
+6. **Method Chaining**  
+   - Encourage chaining for transformations (`df.dropna().groupby("region").agg("sum")`).  
+   - Improves readability and reduces intermediate variables.
+
+### Data Manipulation & Error Handling
+
+1. **Use of `loc` and `iloc`**  
+   - `df.loc[row_filter, "column_name"]` for label-based access.  
+   - `df.iloc[0:5, 2:4]` for position-based slicing.
+
+2. **Missing Data**  
+   - Employ consistent strategies for imputation or removal of missing data.  
+   - Document assumptions about missing data in the notebook markdown cells or code comments.
+
+3. **GroupBy and Aggregations**  
+   - Use `groupby` for efficient summarization (e.g., `df.groupby("category").mean()`).  
+   - Leverage advanced functions like `.agg()`, `.transform()`, or `.apply()` for complex operations.
+
+### Visualization
+
+1. **Matplotlib for Low-Level Control**  
+   - Use `pyplot` or object-oriented approach (`fig, ax = plt.subplots()`).  
+   - Label axes clearly (`ax.set_xlabel("X Label")` / `ax.set_ylabel("Y Label")`).  
+   - Add a title and legend for context.
+
+2. **Seaborn for Statistical and Attractive Plots**  
+   - Use `sns.set_theme()` to define a consistent style.  
+   - Examples: `sns.barplot()`, `sns.histplot()`, `sns.lineplot()`.  
+   - Maintain color-blind-friendly palettes (e.g., `sns.color_palette("colorblind")`).
+
+### Performance Optimization
+
+1. **Vectorized or Built-in Pandas/Numpy Methods**  
+   - Example: `df["col"].str.contains("pattern")` vs. manual loops.  
+   - Use `.describe()`, `.info()`, `.memory_usage()` to diagnose large datasets.
+
+2. **Scaling**  
+   - For massive datasets, consider `dask` or out-of-core processing.  
+   - Profile code with `timeit`, `%prun`, or memory profiling (`memory_profiler`) to identify bottlenecks.
+
+### Jupyter Notebook Best Practices
+
+1. **Notebook Structure**  
+   - Use headings (`#`, `##`, `###`) to divide sections (e.g., Data Loading, EDA, Modeling, Conclusion).  
+   - Document each section with short markdown explanations.
+
+2. **Execution Order**  
+   - Keep the cell execution order linear from top to bottom.  
+   - Restart and run all cells before finalizing the notebook to ensure reproducibility.
+
+3. **Magic Commands**  
+   - Use `%matplotlib inline` or `%matplotlib notebook` for inline/interactive plots.  
+   - `%timeit`, `%prun`, and `%load_ext autoreload` can be helpful in iterative development.
+
+---
+
+## 2. Deep Learning, Transformers, Diffusion Models, & LLMs
+
+**Domains**: PyTorch, Transformers, Diffusers, Gradio
+
+### Key Principles
+
+1. **Concise, GPU-Efficient Code**  
+   - Provide examples using PyTorch (`nn.Module` subclasses).  
+   - Use GPU-based operations (`.cuda()`, `.to(device)`).
+
+2. **Object-Oriented Modeling & Functional Data Processing**  
+   - Encapsulate model architectures in `class MyModel(nn.Module): ...`.  
+   - Use functional programming patterns (e.g., separate data loading/transform logic from the model).
+
+3. **Mixed Precision & Hardware Acceleration**  
+   - Use `torch.cuda.amp` for mixed-precision training if applicable.  
+   - Monitor VRAM usage to optimize for large batch sizes.
+
+### Transformers & LLMs
+
+1. **Transformers Library**  
+   - Use pre-trained models from `transformers` (e.g., `BertModel`, `GPT2LMHeadModel`).  
+   - Correctly handle tokenization (padding, truncation, special tokens).
+
+2. **Attention Mechanisms**  
+   - Ensure attention mask and positional encodings are handled correctly.  
+   - Fine-tune advanced techniques such as LoRA or prefix-tuning as needed.
+
+3. **Sequence Handling**  
+   - Watch out for sequence length limits; use chunking or sliding windows if necessary.  
+   - For language modeling, consider decoding strategies (greedy, beam search, sampling).
+
+### Diffusion Models
+
+1. **Diffusers Library**  
+   - Familiarize yourself with `StableDiffusionPipeline` or other pipeline classes.  
+   - Understand forward (adding noise) and reverse (denoising) diffusion steps.  
+   - Choose appropriate noise schedulers (e.g., DDIMScheduler, DPMSolverMultistepScheduler).
+
+2. **Model Customization**  
+   - Modify UNet or VAE components if exploring custom diffusion architectures.  
+   - Experiment with sampling methods (ancestral sampling, classifier-free guidance, etc.).
+
+### Model Training & Evaluation
+
+1. **DataLoader & Splitting**  
+   - Use `DataLoader` for batch iteration.  
+   - Maintain clear splits: train/validation/test or cross-validation.
+
+2. **Training Loop**  
+   - Implement typical steps: forward pass, compute loss, backward pass, optimizer step.  
+   - Consider `nn.parallel.DistributedDataParallel` for multi-GPU setups.
+
+3. **Monitoring & Logging**  
+   - Use logging libraries (`logging`, `tqdm`, `tensorboard`, or `wandb`) to track metrics.  
+   - Implement early stopping or learning rate scheduling where beneficial.
+
+### Gradio Integration
+
+1. **Interactive Demos**  
+   - Use Gradio interfaces (`gr.Interface`) to expose model inference.  
+   - Validate user inputs with simple checks or custom error messages.
+
+2. **Deployment**  
+   - Deploy your Gradio app on Hugging Face Spaces or your own server.  
+   - Monitor usage and handle concurrency properly (e.g., GPU resource limits).
+
+---
+
+## 3. Python & Django for Scalable Web Applications
+
+**Domains**: Django, Django REST Framework, Celery, Redis
+
+### Key Principles
+
+1. **Leverage Django’s Built-Ins**  
+   - Use Django’s class-based views (CBVs) for complex operations.  
+   - Use function-based views (FBVs) for simple logic if it’s more readable.
+
+2. **Django ORM**  
+   - Avoid raw SQL unless you have a performance-sensitive query that ORM can’t handle efficiently.  
+   - Use `select_related` and `prefetch_related` to reduce DB hits on foreign key or many-to-many relationships.
+
+3. **Modular App Structure**  
+   - Each Django app should be responsible for a specific domain (e.g., `users`, `payments`, `blog`).  
+   - Keep the project structure consistent to aid in maintainability.
+
+### Error Handling & Validation
+
+1. **Built-in Mechanisms**  
+   - Use Django’s built-in validation for forms and models.  
+   - Use `django.core.exceptions.ValidationError` for custom validations.
+
+2. **try-except Blocks**  
+   - Wrap business logic in try-except if exceptions are expected (e.g., external API calls, file I/O).  
+   - Log errors using Django’s logging config (e.g., in `settings.py` or a dedicated logging config).
+
+3. **Custom Error Pages**  
+   - Provide user-friendly 404 and 500 templates (`404.html`, `500.html`) in a global `templates/` directory.  
+   - Show relevant help or troubleshooting steps if appropriate.
+
+### Django-Specific Guidelines
+
+1. **MVT Pattern**  
+   - Keep models for data, views for request handling, and templates for presentation.  
+   - Maintain a consistent naming scheme (e.g., `views.py`, `models.py`, `forms.py`, `urls.py` in each app).
+
+2. **URLs and Routing**  
+   - Use the `path()` or `re_path()` functions in `urls.py` with RESTful patterns.  
+   - Keep route definitions short and descriptive (`"users/<int:user_id>/profile/"`).
+
+3. **Django REST Framework**  
+   - Create `serializers.py` to define how models convert to JSON.  
+   - Use generic class-based views (e.g., `ListCreateAPIView`, `RetrieveUpdateAPIView`) for common patterns.  
+   - Implement permission classes, throttling, and authentication as needed.
+
+### Performance Optimization
+
+1. **Database Optimization**  
+   - Index frequently queried fields.  
+   - Avoid N+1 queries with `select_related` or `prefetch_related`.
+
+2. **Caching**  
+   - Use Django’s cache framework with Redis or Memcached.  
+   - Cache entire pages, partial templates, or specific queryset results where beneficial.
+
+3. **Asynchronous Tasks**  
+   - Offload long-running tasks to Celery, with Redis or RabbitMQ as a broker.  
+   - Use Django Channels or async views for real-time features (Django 3.1+).
+
+4. **Static & Media Files**  
+   - Serve static files efficiently in production (e.g., WhiteNoise, S3, or a CDN).  
+   - Minimize or compress static assets for faster page loads.
+
+---
+
+## Is a “Final Note” Section Necessary?
+
+A “Final Note” (or “Conclusion”) section is **optional**. It can be helpful to:
+
+- Provide a **concise summary** of all the guidelines.  
+- Explain **how to adapt** these rules for new team members or future expansions of the project.  
+- Remind developers to **keep the `.cursorrules` file updated** as frameworks or coding practices evolve.
+
+If you prefer a clean, rule-focused file, you can omit the “Final Note” section and rely on version control or code comments to document changes. It’s purely a matter of preference and team workflow.
+
+---
+
+## Final Note (Optional)
+
+Adjust or expand each section to reflect your current project requirements, your team’s style conventions, or any evolving best practices. The more precise and contextual your `.cursorrules` file is, the more effectively Cursor can assist you throughout development.
+

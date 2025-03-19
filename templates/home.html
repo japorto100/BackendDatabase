@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - LocalGPT Vision{% endblock %}
+
+{% block content %}
+<div class="jumbotron">
+    <h1 class="display-4">Welcome to LocalGPT Vision</h1>
+    <p class="lead">A powerful AI assistant that can understand text, images, and documents.</p>
+    <hr class="my-4">
+    <p>Upload files, ask questions, and get intelligent responses.</p>
+    <a class="btn btn-primary btn-lg" href="/chat/" role="button">Start Chatting</a>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Chat with AI</h5>
+                <p class="card-text">Have natural conversations with our AI assistant.</p>
+                <a href="/chat/" class="btn btn-outline-primary">Go to Chat</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Upload Files</h5>
+                <p class="card-text">Upload images, documents, and more for analysis.</p>
+                <a href="/models/upload/" class="btn btn-outline-primary">Upload Files</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Search</h5>
+                <p class="card-text">Search through your conversations and documents.</p>
+                <a href="/search/" class="btn btn-outline-primary">Search</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

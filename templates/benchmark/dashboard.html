@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Benchmark Dashboard{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/benchmark.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row mb-4">
+    <div class="col">
+      <h1>Model Benchmarking Dashboard</h1>
+      <p class="lead">Compare performance across different models and tasks</p>
+    </div>
+    <div class="col-auto">
+      <a href="{% url 'create_benchmark' %}" class="btn btn-primary">
+        <i class="fas fa-plus"></i> New Benchmark
+      </a>
+    </div>
+  </div>
+
+  {% if recent_runs %}
+  <div class="card mb-4">
+    <div class="card-header">
+      <h2 class="h5 mb-0">Recent Benchmark Runs</h2>
+    </div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Models</th>
+              <th>Tasks</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for run in recent_runs %}
+            <tr>
+              <td>{{ run.name }}</td>
+              <td>
+                <span class="badge {% if run.status == 'completed' %}bg-success{% elif run.status == 'running' %}bg-primary{% elif run.status == 'failed' %}bg-danger{% else %}bg-secondary{% endif %}">
+                  {{ run.status }}
+                </span>
+              </td>
+              <td>{{ run.models_tested|length }}</td>
+              <td>{{ run.tasks.count }}</td>
+              <td>{{ run.start_time|date:"M d, Y H:i" }}</td>
+              <td>
+                {% if run.status == 'completed' %}
+                <a href="{% url 'benchmark_results' run.id %}" class="btn btn-sm btn-outline-primary">
+                  <i class="fas fa-chart-bar"></i> Results
+                </a>
+                {% elif run.status == 'pending' %}
+                <a href="{% url 'run_benchmark' run.id %}" class="btn btn-sm btn-outline-success run-benchmark-btn" data-run-id="{{ run.id }}">
+                  <i class="fas fa-play"></i> Run
+                </a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="row">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="h5 mb-0">Available Benchmark Tasks</h2>
+        </div>
+        <div class="card-body">
+          {% if tasks %}
+          <div class="list-group">
+            {% for task in tasks %}
+            <div class="list-group-item">
+              <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">{{ task.name }}</h5>
+                <small>{{ task.category }}</small>
+              </div>
+              <p class="mb-1">{{ task.description }}</p>
+              <small>{{ task.prompt_count }} prompts</small>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted">No benchmark tasks available. Create one in the admin panel.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="h5 mb-0">Benchmark Statistics</h2>
+        </div>
+        <div class="card-body">
+          <div class="row text-center">
+            <div class="col-4">
+              <div class="h2">{{ recent_runs.count }}</div>
+              <div class="text-muted">Benchmarks Run</div>
+            </div>
+            <div class="col-4">
+              <div class="h2">{{ tasks.count }}</div>
+              <div class="text-muted">Available Tasks</div>
+            </div>
+            <div class="col-4">
+              <div class="h2" id="model-count">-</div>
+              <div class="text-muted">Active Models</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Fetch active model count
+    fetch('/api/models/active-count/')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('model-count').textContent = data.count;
+      })
+      .catch(error => console.error('Error fetching model count:', error));
+    
+    // Handle run benchmark buttons
+    document.querySelectorAll('.run-benchmark-btn').forEach(button => {
+      button.addEventListener('click', function(e) {
+        e.preventDefault();
+        const runId = this.dataset.runId;
+        const url = this.getAttribute('href');
+        
+        this.disabled = true;
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+        
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success && data.redirect) {
+            window.location.href = data.redirect;
+          } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+            this.disabled = false;
+            this.innerHTML = '<i class="fas fa-play"></i> Run';
+          }
+        })
+        .catch(error => {
+          console.error('Error running benchmark:', error);
+          this.disabled = false;
+          this.innerHTML = '<i class="fas fa-play"></i> Run';
+        });
+      });
+    });
+    
+    // CSRF token helper
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+  });
+</script>
+{% endblock %} 

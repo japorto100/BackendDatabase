@@ -1,0 +1,38 @@
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0">Benutzerdefiniertes Modell</h5>
+  </div>
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      
+      <div class="form-check form-switch mb-3">
+        <input class="form-check-input" type="checkbox" id="use_custom_model" name="use_custom_model" 
+               {% if user.settings.use_custom_model %}checked{% endif %}>
+        <label class="form-check-label" for="use_custom_model">Benutzerdefiniertes Modell verwenden</label>
+      </div>
+      
+      <div class="mb-3">
+        <label for="custom_model_url" class="form-label">Modell-URL</label>
+        <input type="text" class="form-control" id="custom_model_url" name="custom_model_url" 
+               value="{{ user.settings.custom_model_url }}" 
+               placeholder="z.B. https://huggingface.co/mistralai/Mistral-7B-v0.1 oder https://github.com/stanford-crfm/mistral">
+        <div class="form-text">
+          Gib die URL zu einem Modell an. Unterstützt werden Hugging Face Modelle, GitHub-Repositories und lokale Dateipfade.
+        </div>
+      </div>
+      
+      <div class="mb-3">
+        <label for="quantization_level" class="form-label">Quantisierungsstufe</label>
+        <select class="form-select" id="quantization_level" name="quantization_level">
+          <option value="4bit" {% if user.profile.quantization_level == '4bit' %}selected{% endif %}>4-bit (schneller, weniger Speicher)</option>
+          <option value="8bit" {% if user.profile.quantization_level == '8bit' %}selected{% endif %}>8-bit (ausgewogen)</option>
+          <option value="16bit" {% if user.profile.quantization_level == '16bit' %}selected{% endif %}>16-bit (bessere Qualität)</option>
+          <option value="32bit" {% if user.profile.quantization_level == '32bit' %}selected{% endif %}>32-bit (höchste Qualität)</option>
+        </select>
+      </div>
+      
+      <button type="submit" class="btn btn-primary">Speichern</button>
+    </form>
+  </div>
+</div> 

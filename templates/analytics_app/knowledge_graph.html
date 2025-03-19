@@ -1,0 +1,652 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4>Knowledge Graph Visualization</h4>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-primary" id="zoom-in">
+                            <i class="fas fa-search-plus"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" id="zoom-out">
+                            <i class="fas fa-search-minus"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" id="reset-view">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="graph-search" placeholder="Search entities...">
+                            <div class="input-group-append">
+                                <button class="btn btn-outline-secondary" type="button" id="search-btn">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="graph-container" style="height: 600px;"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Graph Selection</h4>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for graph in available_graphs %}
+                        <a href="{% url 'knowledge_graph_view' graph.id %}" class="list-group-item {% if graph.id == graph_id %}active{% endif %}">
+                            {{ graph.title }}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            {% if graph_summary %}
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h4>Graph Summary</h4>
+                </div>
+                <div class="card-body">
+                    <ul>
+                        <li><strong>Entities:</strong> {{ graph_summary.entity_count }}</li>
+                        <li><strong>Relationships:</strong> {{ graph_summary.relationship_count }}</li>
+                    </ul>
+                    
+                    <h5>Entity Types</h5>
+                    <div>
+                        <select class="form-control form-control-sm mb-2" id="entity-type-filter">
+                            <option value="all">All Types</option>
+                            {% for type, count in graph_summary.entity_types.items %}
+                            <option value="{{ type }}">{{ type }} ({{ count }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <ul>
+                        {% for type, count in graph_summary.entity_types.items %}
+                        <li>{{ type }}: {{ count }}</li>
+                        {% endfor %}
+                    </ul>
+                    
+                    <h5>Selected Entity</h5>
+                    <div id="selected-entity-info">
+                        <p class="text-muted">Click on an entity to view details</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h4>Export</h4>
+                </div>
+                <div class="card-body">
+                    <button class="btn btn-sm btn-outline-primary mr-2" id="export-png">PNG</button>
+                    <button class="btn btn-sm btn-outline-primary mr-2" id="export-svg">SVG</button>
+                    <button class="btn btn-sm btn-outline-primary" id="export-json">JSON</button>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="btn-group mb-3">
+    <button class="btn btn-sm btn-outline-primary" id="view-force">Force Layout</button>
+    <button class="btn btn-sm btn-outline-primary" id="view-matrix">Matrix View</button>
+    <button class="btn btn-sm btn-outline-primary" id="view-sunburst">Sunburst</button>
+</div>
+
+{% if graph_data %}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+<script>
+    // D3.js visualization code
+    const graphData = JSON.parse('{{ graph_data|escapejs }}');
+    
+    // Initialize visualization
+    const width = document.getElementById('graph-container').clientWidth;
+    const height = document.getElementById('graph-container').clientHeight;
+    
+    // Create SVG with zoom support
+    const svg = d3.select("#graph-container")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+    
+    // Add zoom behavior
+    const zoom = d3.zoom()
+        .scaleExtent([0.1, 4])
+        .on("zoom", (event) => {
+            g.attr("transform", event.transform);
+            updateDetailLevel(event.transform);
+        });
+    
+    svg.call(zoom);
+    
+    // Create a group for all elements (for zooming)
+    const g = svg.append("g");
+    
+    // Create force simulation
+    const simulation = d3.forceSimulation(graphData.nodes)
+        .force("link", d3.forceLink(graphData.links).id(d => d.id))
+        .force("charge", d3.forceManyBody().strength(-300))
+        .force("center", d3.forceCenter(width / 2, height / 2));
+    
+    // Add links
+    const link = g.append("g")
+        .selectAll("line")
+        .data(graphData.links)
+        .enter()
+        .append("line")
+        .attr("stroke", "#999")
+        .attr("stroke-width", 1)
+        .append("title")
+        .text(d => d.type);
+    
+    // Add nodes
+    const node = g.append("g")
+        .selectAll("circle")
+        .data(graphData.nodes)
+        .enter()
+        .append("circle")
+        .attr("r", 5)
+        .attr("fill", d => {
+            // Color nodes by type
+            const typeColors = {
+                "Person": "#1f77b4",
+                "Organization": "#ff7f0e",
+                "Location": "#2ca02c",
+                "Event": "#d62728",
+                "Concept": "#9467bd"
+            };
+            return typeColors[d.type] || "#aaa";
+        })
+        .call(d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended))
+            .on("click", showEntityDetails);
+    
+    // Add node labels
+    const label = g.append("g")
+        .selectAll("text")
+        .data(graphData.nodes)
+        .enter()
+        .append("text")
+        .text(d => d.label)
+        .attr("font-size", 10)
+        .attr("dx", 8)
+        .attr("dy", 3);
+    
+    // Update positions on simulation tick
+    simulation.on("tick", () => {
+        link
+            .attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y);
+        
+        node
+            .attr("cx", d => d.x)
+            .attr("cy", d => d.y);
+        
+        label
+            .attr("x", d => d.x)
+            .attr("y", d => d.y);
+    });
+    
+    // Drag functions
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+    
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+    
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+    
+    // Show entity details when clicked
+    function showEntityDetails(event, d) {
+        const infoDiv = document.getElementById('selected-entity-info');
+        let html = `<h6>${d.label}</h6>`;
+        html += `<p><strong>Type:</strong> ${d.type}</p>`;
+        
+        if (d.properties && Object.keys(d.properties).length > 0) {
+            html += '<table class="table table-sm"><tbody>';
+            for (const [key, value] of Object.entries(d.properties)) {
+                html += `<tr><td>${key}</td><td>${value}</td></tr>`;
+            }
+            html += '</tbody></table>';
+        } else {
+            html += '<p>No additional properties</p>';
+        }
+        
+        infoDiv.innerHTML = html;
+        
+        // Highlight the selected node
+        node.attr("stroke-width", n => n === d ? 2 : 0)
+            .attr("stroke", "#ff0000");
+    }
+    
+    // Search functionality
+    document.getElementById('search-btn').addEventListener('click', searchEntity);
+    document.getElementById('graph-search').addEventListener('keyup', function(event) {
+        if (event.key === 'Enter') {
+            searchEntity();
+        }
+    });
+    
+    function searchEntity() {
+        const searchTerm = document.getElementById('graph-search').value.toLowerCase();
+        if (!searchTerm) return;
+        
+        // Find matching nodes
+        const matchingNodes = graphData.nodes.filter(n => 
+            n.label.toLowerCase().includes(searchTerm) || 
+            n.type.toLowerCase().includes(searchTerm) ||
+            Object.values(n.properties || {}).some(v => 
+                v.toString().toLowerCase().includes(searchTerm)
+            )
+        );
+        
+        if (matchingNodes.length > 0) {
+            // Highlight matching nodes
+            node.attr("r", n => matchingNodes.includes(n) ? 8 : 5)
+                .attr("stroke-width", n => matchingNodes.includes(n) ? 2 : 0)
+                .attr("stroke", "#ff0000");
+            
+            // Center view on first match
+            const firstMatch = matchingNodes[0];
+            const transform = d3.zoomIdentity
+                .translate(width/2, height/2)
+                .scale(1)
+                .translate(-firstMatch.x, -firstMatch.y);
+            
+            svg.transition().duration(750).call(zoom.transform, transform);
+            
+            // Show details of first match
+            showEntityDetails(null, firstMatch);
+        }
+    }
+    
+    // Filter by entity type
+    document.getElementById('entity-type-filter').addEventListener('change', function() {
+        const selectedType = this.value;
+        
+        if (selectedType === 'all') {
+            // Show all nodes
+            node.attr("opacity", 1);
+            label.attr("opacity", 1);
+            link.attr("opacity", 1);
+        } else {
+            // Filter nodes by type
+            const matchingNodes = graphData.nodes.filter(n => n.type === selectedType);
+            const matchingNodeIds = matchingNodes.map(n => n.id);
+            
+            // Show matching nodes and connected links
+            node.attr("opacity", n => n.type === selectedType ? 1 : 0.2);
+            label.attr("opacity", n => n.type === selectedType ? 1 : 0.2);
+            link.attr("opacity", l => 
+                matchingNodeIds.includes(l.source.id) || matchingNodeIds.includes(l.target.id) ? 1 : 0.1
+            );
+        }
+    });
+    
+    // Zoom controls
+    document.getElementById('zoom-in').addEventListener('click', function() {
+        svg.transition().call(zoom.scaleBy, 1.5);
+    });
+    
+    document.getElementById('zoom-out').addEventListener('click', function() {
+        svg.transition().call(zoom.scaleBy, 0.75);
+    });
+    
+    document.getElementById('reset-view').addEventListener('click', function() {
+        svg.transition().call(zoom.transform, d3.zoomIdentity);
+    });
+    
+    // Export functionality
+    document.getElementById('export-png').addEventListener('click', function() {
+        html2canvas(document.querySelector("#graph-container")).then(canvas => {
+            const link = document.createElement('a');
+            link.download = 'knowledge-graph.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        });
+    });
+    
+    document.getElementById('export-svg').addEventListener('click', function() {
+        const svgData = document.querySelector("#graph-container svg").outerHTML;
+        const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
+        const svgUrl = URL.createObjectURL(svgBlob);
+        
+        const link = document.createElement('a');
+        link.download = 'knowledge-graph.svg';
+        link.href = svgUrl;
+        link.click();
+    });
+    
+    document.getElementById('export-json').addEventListener('click', function() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(graphData));
+        const link = document.createElement('a');
+        link.download = 'knowledge-graph.json';
+        link.href = dataStr;
+        link.click();
+    });
+
+    function loadGraphIncrementally(graphData, batchSize=100) {
+        const totalNodes = graphData.nodes.length;
+        let loadedCount = 0;
+        
+        // Clear existing visualization
+        d3.select("#graph-container svg g").selectAll("*").remove();
+        
+        function loadBatch() {
+            const batch = {
+                nodes: graphData.nodes.slice(loadedCount, Math.min(loadedCount + batchSize, totalNodes)),
+                links: graphData.links.filter(link => 
+                    graphData.nodes.slice(0, Math.min(loadedCount + batchSize, totalNodes)).some(n => n.id === link.source.id) &&
+                    graphData.nodes.slice(0, Math.min(loadedCount + batchSize, totalNodes)).some(n => n.id === link.target.id)
+                )
+            };
+            
+            // Add batch to visualization
+            addNodesToVisualization(batch);
+            
+            loadedCount += batchSize;
+            document.getElementById('loading-progress').innerText = 
+                `Loading graph: ${Math.min(loadedCount, totalNodes)} of ${totalNodes} nodes`;
+            
+            if (loadedCount < totalNodes) {
+                setTimeout(loadBatch, 50); // Continue loading with delay
+            } else {
+                document.getElementById('loading-progress').style.display = 'none';
+            }
+        }
+        
+        // Start loading
+        document.getElementById('loading-progress').style.display = 'block';
+        loadBatch();
+    }
+
+    function addNodesToVisualization(batch) {
+        // Add new nodes
+        const newNodes = node.enter()
+            .data(batch.nodes, d => d.id)
+            .enter()
+            .append("circle")
+            .attr("r", 5)
+            .attr("fill", d => {
+                const typeColors = {
+                    "Person": "#1f77b4",
+                    "Organization": "#ff7f0e",
+                    "Location": "#2ca02c",
+                    "Event": "#d62728",
+                    "Concept": "#9467bd"
+                };
+                return typeColors[d.type] || "#aaa";
+            })
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended))
+            .on("click", showEntityDetails);
+        
+        // Add new links
+        const newLinks = link.enter()
+            .data(batch.links, d => d.source.id + "-" + d.target.id)
+            .enter()
+            .append("line")
+            .attr("stroke", "#999")
+            .attr("stroke-width", 1)
+            .append("title")
+            .text(d => d.type);
+        
+        // Add new labels
+        const newLabels = label.enter()
+            .data(batch.nodes, d => d.id)
+            .enter()
+            .append("text")
+            .text(d => d.label)
+            .attr("font-size", 10)
+            .attr("dx", 8)
+            .attr("dy", 3);
+        
+        // Update simulation
+        simulation.nodes(graphData.nodes);
+        simulation.force("link").links(graphData.links);
+        simulation.alpha(0.3).restart();
+    }
+
+    // Use this instead of directly loading the graph
+    loadGraphIncrementally(graphData, 100);
+
+    function updateDetailLevel(transform) {
+        const zoomLevel = transform.k;
+        
+        // Adjust detail based on zoom
+        if (zoomLevel < 0.5) {
+            // Low detail - hide labels, simplify nodes
+            node.attr("r", 2);
+            label.style("display", "none");
+            link.attr("stroke-opacity", 0.3);
+        } else if (zoomLevel < 1.0) {
+            // Medium detail
+            node.attr("r", 4);
+            label.style("display", d => d.type === 'Person' || d.type === 'Organization' ? "block" : "none");
+            link.attr("stroke-opacity", 0.6);
+        } else {
+            // High detail
+            node.attr("r", 5);
+            label.style("display", "block");
+            link.attr("stroke-opacity", 1.0);
+        }
+    }
+
+    function clusterByEntityType(graphData) {
+        // Group entities by type
+        const entityTypeGroups = {};
+        graphData.nodes.forEach(node => {
+            if (!entityTypeGroups[node.type]) {
+                entityTypeGroups[node.type] = [];
+            }
+            entityTypeGroups[node.type].push(node);
+        });
+        
+        // Create cluster nodes
+        const clusters = Object.keys(entityTypeGroups).map(type => ({
+            id: `cluster_${type}`,
+            label: `${type} (${entityTypeGroups[type].length})`,
+            type: 'Cluster',
+            size: entityTypeGroups[type].length,
+            entities: entityTypeGroups[type]
+        }));
+        
+        // Create links between clusters
+        const clusterLinks = [];
+        graphData.links.forEach(link => {
+            const sourceType = graphData.nodes.find(n => n.id === link.source.id)?.type;
+            const targetType = graphData.nodes.find(n => n.id === link.target.id)?.type;
+            
+            if (sourceType && targetType) {
+                // Check if this cluster pair already has a link
+                const existingLink = clusterLinks.find(l => 
+                    (l.source === `cluster_${sourceType}` && l.target === `cluster_${targetType}`) ||
+                    (l.source === `cluster_${targetType}` && l.target === `cluster_${sourceType}`)
+                );
+                
+                if (existingLink) {
+                    existingLink.value += 1;
+                } else {
+                    clusterLinks.push({
+                        source: `cluster_${sourceType}`,
+                        target: `cluster_${targetType}`,
+                        type: 'cluster_link',
+                        value: 1
+                    });
+                }
+            }
+        });
+        
+        return {
+            nodes: clusters,
+            links: clusterLinks
+        };
+    }
+
+    // Add UI control for clustering
+    document.getElementById('toggle-clustering').addEventListener('click', function() {
+        const isClustered = this.getAttribute('data-clustered') === 'true';
+        
+        if (isClustered) {
+            // Switch back to detailed view
+            loadGraphIncrementally(graphData);
+            this.setAttribute('data-clustered', 'false');
+            this.innerText = 'Show Clusters';
+        } else {
+            // Switch to clustered view
+            const clusteredData = clusterByEntityType(graphData);
+            simulation.stop();
+            
+            // Clear existing graph
+            d3.select("#graph-container svg g").selectAll("*").remove();
+            
+            // Load clustered graph
+            loadGraphData(clusteredData);
+            
+            this.setAttribute('data-clustered', 'true');
+            this.innerText = 'Show Details';
+        }
+    });
+
+    function createMatrixView(graphData) {
+        // Clear existing visualization
+        d3.select("#graph-container svg").remove();
+        
+        const entities = graphData.nodes;
+        const matrix = [];
+        
+        // Create empty matrix
+        entities.forEach((source, i) => {
+            matrix[i] = Array(entities.length).fill(0);
+            
+            // Fill in relationships
+            graphData.links.forEach(link => {
+                if (link.source.id === source.id) {
+                    const targetIndex = entities.findIndex(e => e.id === link.target.id);
+                    if (targetIndex >= 0) {
+                        matrix[i][targetIndex] = 1;
+                    }
+                }
+            });
+        });
+        
+        // Create SVG for matrix visualization
+        const svg = d3.select("#graph-container")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height);
+        
+        const matrixSize = Math.min(width, height) - 100;
+        const cellSize = matrixSize / entities.length;
+        
+        // Create matrix cells
+        const g = svg.append("g")
+            .attr("transform", `translate(50, 50)`);
+        
+        // Add row labels (source entities)
+        g.selectAll(".row-label")
+            .data(entities)
+            .enter()
+            .append("text")
+            .attr("class", "row-label")
+            .attr("x", -5)
+            .attr("y", (d, i) => i * cellSize + cellSize / 2)
+            .attr("text-anchor", "end")
+            .attr("alignment-baseline", "middle")
+            .attr("font-size", "10px")
+            .text(d => d.label.substring(0, 10));
+        
+        // Add column labels (target entities)
+        g.selectAll(".col-label")
+            .data(entities)
+            .enter()
+            .append("text")
+            .attr("class", "col-label")
+            .attr("x", (d, i) => i * cellSize + cellSize / 2)
+            .attr("y", -5)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "10px")
+            .style("writing-mode", "tb")
+            .text(d => d.label.substring(0, 10));
+        
+        // Create matrix cells
+        for (let i = 0; i < entities.length; i++) {
+            for (let j = 0; j < entities.length; j++) {
+                g.append("rect")
+                    .attr("x", j * cellSize)
+                    .attr("y", i * cellSize)
+                    .attr("width", cellSize)
+                    .attr("height", cellSize)
+                    .attr("fill", matrix[i][j] ? "#1f77b4" : "#eee")
+                    .attr("stroke", "#fff")
+                    .on("mouseover", function() {
+                        const source = entities[i];
+                        const target = entities[j];
+                        
+                        // Show tooltip
+                        const tooltip = d3.select("#tooltip");
+                        tooltip.style("display", "block")
+                            .html(`${source.label} → ${target.label}`);
+                        
+                        // Highlight row and column
+                        g.selectAll("rect")
+                            .attr("opacity", (d, idx) => {
+                                const row = Math.floor(idx / entities.length);
+                                const col = idx % entities.length;
+                                return (row === i || col === j) ? 1.0 : 0.3;
+                            });
+                    })
+                    .on("mouseout", function() {
+                        // Hide tooltip
+                        d3.select("#tooltip").style("display", "none");
+                        
+                        // Reset highlighting
+                        g.selectAll("rect").attr("opacity", 1.0);
+                    });
+            }
+        }
+    }
+
+    // Add event listeners for visualization mode buttons
+    document.getElementById('view-force').addEventListener('click', function() {
+        d3.select("#graph-container svg").remove();
+        createForceLayout(graphData);
+    });
+
+    document.getElementById('view-matrix').addEventListener('click', function() {
+        createMatrixView(graphData);
+    });
+
+    document.getElementById('view-sunburst').addEventListener('click', function() {
+        createSunburstView(graphData);
+    });
+</script>
+{% endif %}
+{% endblock %}

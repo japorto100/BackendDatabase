@@ -1,0 +1,39 @@
+/* Bestehendes CSS */
+
+/* Neues CSS für Evidence Integration */
+.ai-message evidence-explorer {
+    margin-top: 16px;
+    display: block;
+    border-top: 1px solid var(--border-color, #e0e0e0);
+    padding-top: 8px;
+}
+
+/* Style für Nachrichten mit Evidence */
+.message.assistant[data-has-evidence="true"] {
+    border-left: 3px solid var(--evidence-color, #3498db);
+}
+
+/* Optionaler Hinweis auf verfügbare Quellen */
+.evidence-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 6px;
+    background-color: var(--badge-bg, #e1f5fe);
+    color: var(--badge-color, #0288d1);
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* Styling für Citations innerhalb von Nachrichten */
+.citation {
+    background-color: var(--citation-bg, rgba(52, 152, 219, 0.2));
+    padding: 1px 3px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.citation:hover {
+    background-color: var(--citation-hover-bg, rgba(52, 152, 219, 0.4));
+} 

@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+
+{% block title %}User Profile - LocalGPT Vision{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2>User Profile</h2>
+        <p class="text-muted">Manage your profile and settings</p>
+    </div>
+</div>
+
+{% if messages %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="profile-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personal" type="button" role="tab" aria-controls="personal" aria-selected="true">Personal Information</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="preferences-tab" data-bs-toggle="tab" data-bs-target="#preferences" type="button" role="tab" aria-controls="preferences" aria-selected="false">Preferences</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="api-keys-tab" data-bs-toggle="tab" data-bs-target="#api-keys" type="button" role="tab" aria-controls="api-keys" aria-selected="false">API Keys</button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content" id="profile-tab-content">
+                    <div class="tab-pane fade show active" id="personal" role="tabpanel" aria-labelledby="personal-tab">
+                        <form method="post">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="{{ user_form.first_name.id_for_label }}" class="form-label">First Name</label>
+                                {{ user_form.first_name }}
+                            </div>
+                            <div class="mb-3">
+                                <label for="{{ user_form.last_name.id_for_label }}" class="form-label">Last Name</label>
+                                {{ user_form.last_name }}
+                            </div>
+                            <div class="mb-3">
+                                <label for="{{ user_form.email.id_for_label }}" class="form-label">Email</label>
+                                {{ user_form.email }}
+                            </div>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </form>
+                    </div>
+                    <div class="tab-pane fade" id="preferences" role="tabpanel" aria-labelledby="preferences-tab">
+                        <form method="post">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="{{ profile_form.theme.id_for_label }}" class="form-label">Theme</label>
+                                {{ profile_form.theme }}
+                            </div>
+                            <div class="mb-3">
+                                <label for="{{ profile_form.default_model.id_for_label }}" class="form-label">Default AI Model</label>
+                                {{ profile_form.default_model }}
+                                <div class="form-text">This model will be used by default for new chat sessions.</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Save Preferences</button>
+                        </form>
+                    </div>
+                    <div class="tab-pane fade" id="api-keys" role="tabpanel" aria-labelledby="api-keys-tab">
+                        <form method="post">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="{{ profile_form.openai_api_key.id_for_label }}" class="form-label">OpenAI API Key</label>
+                                {{ profile_form.openai_api_key }}
+                                <div class="form-text">Required for OpenAI models (GPT-3.5, GPT-4, etc.)</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="{{ profile_form.anthropic_api_key.id_for_label }}" class="form-label">Anthropic API Key</label>
+                                {{ profile_form.anthropic_api_key }}
+                                <div class="form-text">Required for Anthropic models (Claude, etc.)</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Save API Keys</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Usage Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6>Messages Sent Today</h6>
+                    <div class="progress mb-2">
+                        <div class="progress-bar" role="progressbar" 
+                             style="--progress-width: {{ usage_stats.messages_sent_today|div:usage_stats.daily_message_limit|mul:100 }}; width: calc(var(--progress-width) * 1%);" 
+                             aria-valuenow="{{ usage_stats.messages_sent_today }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="{{ usage_stats.daily_message_limit }}"></div>
+                    </div>
+                    <small class="text-muted">{{ usage_stats.messages_sent_today }} / {{ usage_stats.daily_message_limit }}</small>
+                </div>
+                <div class="mb-3">
+                    <h6>Files Uploaded Today</h6>
+                    <div class="progress mb-2">
+                        <div class="progress-bar" role="progressbar" 
+                             style="--progress-width: {{ usage_stats.files_uploaded_today|div:usage_stats.daily_file_upload_limit|mul:100 }}; width: calc(var(--progress-width) * 1%);" 
+                             aria-valuenow="{{ usage_stats.files_uploaded_today }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="{{ usage_stats.daily_file_upload_limit }}"></div>
+                    </div>
+                    <small class="text-muted">{{ usage_stats.files_uploaded_today }} / {{ usage_stats.daily_file_upload_limit }}</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Available Models</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% for model in available_models %}
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ model.name }}</h6>
+                            <small class="text-muted">{{ model.provider }}</small>
+                        </div>
+                        <p class="mb-1">
+                            {% if model.vision_capable %}
+                            <span class="badge bg-success">Vision</span>
+                            {% endif %}
+                            <small class="text-muted">Max tokens: {{ model.max_tokens }}</small>
+                        </p>
+                    </div>
+                    {% empty %}
+                    <div class="list-group-item">
+                        <p class="mb-0">No models available</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Handle tab navigation from URL hash
+        let hash = window.location.hash;
+        if (hash) {
+            $('#profile-tabs a[href="' + hash + '"]').tab('show');
+        }
+        
+        // Update URL hash when tab changes
+        $('#profile-tabs a').on('shown.bs.tab', function(e) {
+            window.location.hash = e.target.getAttribute('data-bs-target');
+        });
+    });
+</script>
+{% endblock %} 

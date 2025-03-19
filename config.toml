@@ -1,0 +1,33 @@
+[GENERAL]
+DEBUG = true
+SECRET_KEY = "your-secret-key-here"
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+SIMILARITY_MEASURE = "cosine"  # "cosine" or "dot"
+
+[API_KEYS]
+OPENAI = ""  # OpenAI API key - sk-1234567890abcdef1234567890abcdef
+GROQ = ""    # Groq API key - gsk_1234567890abcdef1234567890abcdef
+ANTHROPIC = ""  # Anthropic API key - sk-ant-1234567890abcdef1234567890abcdef
+
+[API_ENDPOINTS]
+SEARXNG = "http://localhost:32768"  # SearxNG API URL
+
+[DATABASE]
+ENGINE = "django.db.backends.sqlite3"
+NAME = "db.sqlite3"
+USER = ""
+PASSWORD = ""
+HOST = ""
+PORT = ""
+
+[MEDIA]
+ROOT = "media/"
+URL = "/media/"
+
+[STATIC]
+ROOT = "static/"
+URL = "/static/"
+
+[CORS]
+ALLOW_ALL_ORIGINS = true
+ALLOWED_ORIGINS = ["http://localhost:3000"] 

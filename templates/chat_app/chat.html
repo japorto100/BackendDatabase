@@ -1,0 +1,297 @@
+{% extends 'base.html' %}
+
+{% block title %}Chat - LocalGPT Vision{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-container {
+        height: 70vh;
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 15px;
+        background-color: #f9f9f9;
+    }
+    .message {
+        margin-bottom: 15px;
+        padding: 10px 15px;
+        border-radius: 10px;
+        max-width: 80%;
+    }
+    .user-message {
+        background-color: #dcf8c6;
+        margin-left: auto;
+    }
+    .assistant-message {
+        background-color: #f1f0f0;
+    }
+    .system-message {
+        background-color: #e3f2fd;
+        font-style: italic;
+        margin: 10px auto;
+        text-align: center;
+    }
+    .message-input {
+        border-radius: 20px;
+    }
+    .file-upload {
+        margin-bottom: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                <h5>Chat Sessions</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group" id="chat-sessions">
+                    <!-- Chat sessions will be loaded here -->
+                </div>
+                <button class="btn btn-primary mt-3 w-100" id="new-chat-btn">
+                    <i class="fas fa-plus"></i> New Chat
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-9">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 id="current-chat-title">New Chat</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary" id="rename-chat-btn">
+                        <i class="fas fa-edit"></i> Rename
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chat-container" id="chat-messages">
+                    <!-- Messages will be displayed here -->
+                </div>
+                <div class="file-upload mt-3">
+                    <form id="file-upload-form" enctype="multipart/form-data">
+                        <div class="input-group">
+                            <input type="file" class="form-control" id="file-input" multiple>
+                            <button class="btn btn-outline-secondary" type="submit">
+                                <i class="fas fa-upload"></i> Upload
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <form id="message-form">
+                    <div class="input-group">
+                        <input type="text" class="form-control message-input" id="message-input" placeholder="Type your message...">
+                        <button class="btn btn-primary" type="submit">
+                            <i class="fas fa-paper-plane"></i> Send
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        let currentChatId = null;
+        
+        // Load chat sessions
+        function loadChatSessions() {
+            $.ajax({
+                url: '/api/chat/',
+                type: 'GET',
+                success: function(data) {
+                    $('#chat-sessions').empty();
+                    if (data.length === 0) {
+                        $('#chat-sessions').append('<p class="text-muted">No chat sessions yet</p>');
+                    } else {
+                        data.forEach(function(chat) {
+                            $('#chat-sessions').append(`
+                                <a href="#" class="list-group-item list-group-item-action chat-session" data-id="${chat.id}">
+                                    ${chat.title}
+                                </a>
+                            `);
+                        });
+                    }
+                }
+            });
+        }
+        
+        // Load chat messages
+        function loadChatMessages(chatId) {
+            $.ajax({
+                url: `/api/chat/${chatId}/`,
+                type: 'GET',
+                success: function(data) {
+                    $('#chat-messages').empty();
+                    $('#current-chat-title').text(data.title);
+                    
+                    data.messages.forEach(function(message) {
+                        let messageClass = '';
+                        if (message.role === 'user') {
+                            messageClass = 'user-message';
+                        } else if (message.role === 'assistant') {
+                            messageClass = 'assistant-message';
+                        } else {
+                            messageClass = 'system-message';
+                        }
+                        
+                        $('#chat-messages').append(`
+                            <div class="message ${messageClass}">
+                                ${message.content}
+                            </div>
+                        `);
+                    });
+                    
+                    // Scroll to bottom
+                    $('#chat-messages').scrollTop($('#chat-messages')[0].scrollHeight);
+                }
+            });
+        }
+        
+        // Create new chat
+        $('#new-chat-btn').click(function() {
+            $.ajax({
+                url: '/api/chat/',
+                type: 'POST',
+                data: JSON.stringify({
+                    title: 'New Chat'
+                }),
+                contentType: 'application/json',
+                success: function(data) {
+                    currentChatId = data.id;
+                    loadChatSessions();
+                    $('#chat-messages').empty();
+                    $('#current-chat-title').text('New Chat');
+                }
+            });
+        });
+        
+        // Send message
+        $('#message-form').submit(function(e) {
+            e.preventDefault();
+            
+            const message = $('#message-input').val().trim();
+            if (!message) return;
+            
+            if (!currentChatId) {
+                // Create a new chat first
+                $.ajax({
+                    url: '/api/chat/',
+                    type: 'POST',
+                    data: JSON.stringify({
+                        title: 'New Chat'
+                    }),
+                    contentType: 'application/json',
+                    success: function(data) {
+                        currentChatId = data.id;
+                        sendMessage(message);
+                        loadChatSessions();
+                    }
+                });
+            } else {
+                sendMessage(message);
+            }
+            
+            $('#message-input').val('');
+        });
+        
+        function sendMessage(message) {
+            // Add user message to UI immediately
+            $('#chat-messages').append(`
+                <div class="message user-message">
+                    ${message}
+                </div>
+            `);
+            
+            // Scroll to bottom
+            $('#chat-messages').scrollTop($('#chat-messages')[0].scrollHeight);
+            
+            // Send to API
+            $.ajax({
+                url: `/api/chat/${currentChatId}/`,
+                type: 'POST',
+                data: JSON.stringify({
+                    message: message
+                }),
+                contentType: 'application/json',
+                success: function(data) {
+                    // Add AI response to UI
+                    $('#chat-messages').append(`
+                        <div class="message assistant-message">
+                            ${data.ai_response.content}
+                        </div>
+                    `);
+                    
+                    // Scroll to bottom
+                    $('#chat-messages').scrollTop($('#chat-messages')[0].scrollHeight);
+                }
+            });
+        }
+        
+        // Select chat session
+        $(document).on('click', '.chat-session', function() {
+            currentChatId = $(this).data('id');
+            loadChatMessages(currentChatId);
+        });
+        
+        // Upload file
+        $('#file-upload-form').submit(function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const files = $('#file-input')[0].files;
+            
+            if (files.length === 0) return;
+            
+            for (let i = 0; i < files.length; i++) {
+                formData.append('file', files[i]);
+                
+                // Determine file type
+                const fileName = files[i].name.toLowerCase();
+                let fileType = 'document';
+                
+                if (fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/)) {
+                    fileType = 'image';
+                } else if (fileName.match(/\.(mp4|avi|mov|wmv|flv|mkv)$/)) {
+                    fileType = 'video';
+                } else if (fileName.match(/\.(mp3|wav|ogg|flac|aac)$/)) {
+                    fileType = 'audio';
+                }
+                
+                formData.append('file_type', fileType);
+            }
+            
+            $.ajax({
+                url: '/api/models/upload/',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    // Add system message about file upload
+                    $('#chat-messages').append(`
+                        <div class="message system-message">
+                            File uploaded: ${data.file}
+                        </div>
+                    `);
+                    
+                    // Clear file input
+                    $('#file-input').val('');
+                    
+                    // Scroll to bottom
+                    $('#chat-messages').scrollTop($('#chat-messages')[0].scrollHeight);
+                }
+            });
+        });
+        
+        // Initial load
+        loadChatSessions();
+    });
+</script>
+{% endblock %} 

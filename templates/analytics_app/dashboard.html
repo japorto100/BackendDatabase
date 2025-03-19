@@ -1,0 +1,237 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Dashboard - LocalGPT Vision{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        transition: all 0.3s ease;
+    }
+    .stats-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .chart-container {
+        height: 300px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2>Admin Dashboard</h2>
+        <p class="text-muted">System statistics and analytics</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white stats-card">
+            <div class="card-body text-center">
+                <h1 id="total-users">0</h1>
+                <p>Total Users</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white stats-card">
+            <div class="card-body text-center">
+                <h1 id="total-chats">0</h1>
+                <p>Chat Sessions</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white stats-card">
+            <div class="card-body text-center">
+                <h1 id="total-messages">0</h1>
+                <p>Messages</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white stats-card">
+            <div class="card-body text-center">
+                <h1 id="total-files">0</h1>
+                <p>Files Uploaded</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>API Requests (Last 7 Days)</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="api-requests-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Response Times (ms)</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="response-times-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Recent API Requests</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>User</th>
+                                <th>Endpoint</th>
+                                <th>Method</th>
+                                <th>Status</th>
+                                <th>Response Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-requests">
+                            <tr>
+                                <td colspan="6" class="text-center">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    $(document).ready(function() {
+        // Load dashboard data
+        function loadDashboardData() {
+            $.ajax({
+                url: '/api/analytics/dashboard/',
+                type: 'GET',
+                success: function(data) {
+                    // Update stats
+                    $('#total-users').text(data.stats.total_users);
+                    $('#total-chats').text(data.stats.total_chats);
+                    $('#total-messages').text(data.stats.total_messages);
+                    $('#total-files').text(data.stats.total_files);
+                    
+                    // Update charts
+                    createApiRequestsChart(data.api_requests);
+                    createResponseTimesChart(data.response_times);
+                    
+                    // Update recent requests table
+                    updateRecentRequests(data.recent_requests);
+                }
+            });
+        }
+        
+        // Create API requests chart
+        function createApiRequestsChart(data) {
+            const ctx = document.getElementById('api-requests-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'API Requests',
+                        data: data.values,
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 2,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Create response times chart
+        function createResponseTimesChart(data) {
+            const ctx = document.getElementById('response-times-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.endpoints,
+                    datasets: [{
+                        label: 'Avg Response Time (ms)',
+                        data: data.times,
+                        backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                        borderColor: 'rgba(255, 159, 64, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update recent requests table
+        function updateRecentRequests(requests) {
+            const tbody = $('#recent-requests');
+            tbody.empty();
+            
+            requests.forEach(function(req) {
+                const row = $('<tr></tr>');
+                
+                row.append(`<td>${new Date(req.timestamp).toLocaleString()}</td>`);
+                row.append(`<td>${req.user || 'Anonymous'}</td>`);
+                row.append(`<td>${req.endpoint}</td>`);
+                row.append(`<td>${req.method}</td>`);
+                
+                let statusClass = 'text-success';
+                if (req.status_code >= 400) {
+                    statusClass = 'text-danger';
+                } else if (req.status_code >= 300) {
+                    statusClass = 'text-warning';
+                }
+                
+                row.append(`<td><span class="${statusClass}">${req.status_code}</span></td>`);
+                row.append(`<td>${(req.response_time * 1000).toFixed(2)} ms</td>`);
+                
+                tbody.append(row);
+            });
+        }
+        
+        // Initial load
+        loadDashboardData();
+        
+        // Refresh every 30 seconds
+        setInterval(loadDashboardData, 30000);
+    });
+</script>
+{% endblock %} 

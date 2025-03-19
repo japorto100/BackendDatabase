@@ -1,0 +1,199 @@
+{% extends 'base.html' %}
+
+{% block title %}File Upload - LocalGPT Vision{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h5>Upload Files</h5>
+            </div>
+            <div class="card-body">
+                <form id="file-upload-form" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="file-input" class="form-label">Select Files</label>
+                        <input type="file" class="form-control" id="file-input" multiple>
+                        <div class="form-text">
+                            Supported file types: Images (jpg, png, etc.), Documents (pdf, docx, etc.), 
+                            Videos (mp4, etc.), Audio (mp3, etc.)
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">File Type</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="file-type" id="type-auto" value="auto" checked>
+                            <label class="form-check-label" for="type-auto">
+                                Auto-detect
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="file-type" id="type-document" value="document">
+                            <label class="form-check-label" for="type-document">
+                                Document
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="file-type" id="type-image" value="image">
+                            <label class="form-check-label" for="type-image">
+                                Image
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="file-type" id="type-video" value="video">
+                            <label class="form-check-label" for="type-video">
+                                Video
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="file-type" id="type-audio" value="audio">
+                            <label class="form-check-label" for="type-audio">
+                                Audio
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload"></i> Upload
+                    </button>
+                </form>
+                
+                <div class="mt-4">
+                    <h6>Upload Results</h6>
+                    <div id="upload-results" class="border rounded p-3 bg-light">
+                        <p class="text-muted">Upload files to see results here</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>Recent Uploads</h5>
+            </div>
+            <div class="card-body">
+                <div id="recent-uploads">
+                    <p class="text-muted">Loading recent uploads...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Load recent uploads
+        function loadRecentUploads() {
+            // This would be an API endpoint to get recent uploads
+            // For now, we'll just show a placeholder
+            $('#recent-uploads').html(`
+                <div class="list-group">
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">example.jpg</h6>
+                            <small>Just now</small>
+                        </div>
+                        <p class="mb-1">Image file - Processed</p>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">document.pdf</h6>
+                            <small>5 minutes ago</small>
+                        </div>
+                        <p class="mb-1">Document file - Processed</p>
+                    </div>
+                </div>
+            `);
+        }
+        
+        // Handle file upload
+        $('#file-upload-form').submit(function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const files = $('#file-input')[0].files;
+            
+            if (files.length === 0) {
+                alert('Please select at least one file');
+                return;
+            }
+            
+            // Show loading state
+            $('#upload-results').html(`
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Uploading and processing files...</p>
+                </div>
+            `);
+            
+            // Get selected file type
+            let fileType = $('input[name="file-type"]:checked').val();
+            
+            for (let i = 0; i < files.length; i++) {
+                formData.append('file', files[i]);
+                
+                // If auto-detect, determine file type
+                if (fileType === 'auto') {
+                    const fileName = files[i].name.toLowerCase();
+                    let detectedType = 'document';
+                    
+                    if (fileName.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/)) {
+                        detectedType = 'image';
+                    } else if (fileName.match(/\.(mp4|avi|mov|wmv|flv|mkv)$/)) {
+                        detectedType = 'video';
+                    } else if (fileName.match(/\.(mp3|wav|ogg|flac|aac)$/)) {
+                        detectedType = 'audio';
+                    }
+                    
+                    formData.append('file_type', detectedType);
+                } else {
+                    formData.append('file_type', fileType);
+                }
+            }
+            
+            $.ajax({
+                url: '/api/models/upload/',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    // Show results
+                    $('#upload-results').html(`
+                        <div class="alert alert-success">
+                            <h6>File uploaded successfully!</h6>
+                            <p>File: ${data.file}</p>
+                            <p>Type: ${data.file_type}</p>
+                            <p>Status: ${data.processed ? 'Processed' : 'Pending'}</p>
+                            <pre>${JSON.stringify(data.processing_results, null, 2)}</pre>
+                        </div>
+                    `);
+                    
+                    // Clear file input
+                    $('#file-input').val('');
+                    
+                    // Reload recent uploads
+                    loadRecentUploads();
+                },
+                error: function(xhr, status, error) {
+                    // Show error
+                    $('#upload-results').html(`
+                        <div class="alert alert-danger">
+                            <h6>Upload failed</h6>
+                            <p>${xhr.responseText || error}</p>
+                        </div>
+                    `);
+                }
+            });
+        });
+        
+        // Initial load
+        loadRecentUploads();
+    });
+</script>
+{% endblock %} 

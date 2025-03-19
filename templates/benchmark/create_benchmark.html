@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Create Benchmark{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/benchmark.css' %}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row mb-4">
+    <div class="col">
+      <h1>Create New Benchmark</h1>
+      <p class="lead">Configure a benchmark to compare model performance</p>
+    </div>
+    <div class="col-auto">
+      <a href="{% url 'benchmark_dashboard' %}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Back to Dashboard
+      </a>
+    </div>
+  </div>
+
+  {% if error %}
+  <div class="alert alert-danger" role="alert">
+    {{ error }}
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-body">
+      <form method="post" id="benchmark-form">
+        {% csrf_token %}
+        
+        <div class="mb-3">
+          <label for="name" class="form-label">Benchmark Name</label>
+          <input type="text" class="form-control" id="name" name="name" required>
+          <div class="form-text">A descriptive name for this benchmark run</div>
+        </div>
+        
+        <div class="mb-3">
+          <label for="description" class="form-label">Description (Optional)</label>
+          <textarea class="form-control" id="description" name="description" rows="2"></textarea>
+        </div>
+        
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label for="tasks" class="form-label">Select Tasks</label>
+            <select class="form-control select2" id="tasks" name="tasks" multiple required>
+              {% for task in tasks %}
+              <option value="{{ task.id }}">{{ task.name }} ({{ task.category }})</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Choose one or more tasks to benchmark</div>
+          </div>
+          
+          <div class="col-md-6 mb-3">
+            <label for="models" class="form-label">Select Models</label>
+            <select class="form-control select2" id="models" name="models" multiple required>
+              {% for model in models %}
+              <option value="{{ model.model_id }}">{{ model.name }} ({{ model.provider_name }})</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">Choose one or more models to benchmark</div>
+          </div>
+        </div>
+        
+        <div class="mb-3">
+          <label for="iterations" class="form-label">Iterations</label>
+          <input type="number" class="form-control" id="iterations" name="iterations" min="1" max="10" value="3">
+          <div class="form-text">Number of times to run each prompt (higher values give more reliable results)</div>
+        </div>
+        
+        <div class="alert alert-info" role="alert">
+          <i class="fas fa-info-circle"></i> Benchmarks may take several minutes to complete depending on the number of tasks, models, and iterations selected.
+        </div>
+        
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+          <button type="submit" class="btn btn-primary">
+            <i class="fas fa-play"></i> Run Benchmark
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+  $(document).ready(function() {
+    $('.select2').select2({
+      theme: 'bootstrap4',
+      placeholder: 'Select options',
+      width: '100%'
+    });
+    
+    $('#benchmark-form').on('submit', function() {
+      const tasksCount = $('#tasks').val().length;
+      const modelsCount = $('#models').val().length;
+      const iterations = parseInt($('#iterations').val());
+      
+      // Warn if the benchmark might take a long time
+      if (tasksCount * modelsCount * iterations > 50) {
+        return confirm('This benchmark configuration may take a significant amount of time to complete. Do you want to continue?');
+      }
+      
+      return true;
+    });
+  });
+</script>
+{% endblock %} 
