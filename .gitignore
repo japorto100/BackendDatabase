@@ -2,10 +2,20 @@
 /.vscode
 /DB
 
+# Virtual environments
+/lion/
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
 # Byte-compiled / optimized / DLL files
-# __pycache__/
-# *.py[cod]
-# *$py.class
+__pycache__/
+*.py[cod]
+*$py.class
 
 # C extensions
 *.so
@@ -62,8 +72,8 @@ cover/
 # Django stuff:
 *.log
 local_settings.py
-# db.sqlite3
-# db.sqlite3-journal
+db.sqlite3
+db.sqlite3-journal
 
 # Flask stuff:
 instance/
@@ -124,13 +134,13 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-# .env
-# .venv
-# env/
-# venv/
-# ENV/
-# env.bak/
-# venv.bak/
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
 # Spyder project settings
 .spyderproject
@@ -167,8 +177,8 @@ cython_debug/
 .DS_Store
 SOURCE_DOCUMENTS/.DS_Store
 
-
-# .byaldi/
-# sessions/
-# static/images/
-# uploaded_documents/
+# Project-specific folders
+.byaldi/
+sessions/
+static/images/
+uploaded_documents/
